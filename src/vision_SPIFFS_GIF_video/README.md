@@ -3,10 +3,14 @@
 如果你只是想要一个可以简单地显示元素图标或者野兽仙贝，且不需要经常更改显示内容的钥匙链，那这个 Demo 适合你。   
 
 ## 测试效果 
+![image](https://user-images.githubusercontent.com/8705034/155977538-5bb3ef90-7baa-4e10-b06e-492b431bec85.png)
+
 见 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试 - bcccc23333](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
 
 ## 硬件
-这个例子没有使用到板上的 SD Nand，如果你想用这个例子那就可以不焊。   
+目前版本的代码可配合 [方版（ST7789）](https://oshwhub.com/libc0607/esp32_vision_v3-2_liyuev3_st7789_rel) 及 [圆版（GC9A01）](https://oshwhub.com/libc0607/esp32_vision_v3-2_gc9a01_rel) 硬件版本 V3.2 使用。  
+
+这个例子没有使用到板上的 SD Nand 和那个 0402 封装的 NTC，如果你想用这个例子那就可以不焊。（SD Nand 一片也十多块呢x）    
 这个例子通过修改代码的方式同时支持 方版（ST7789）和 圆版（GC9A01），修改方式见下文。  
 
 ## 功能
@@ -14,6 +18,7 @@
  - 播放完成后进入深度睡眠
  - 通过双击唤醒或是定时器唤醒（代码中默认 30s），再播放一次 GIF 图片，如此循环
  - 如果电量低，它就不亮了 （？废话）
+ - 每次唤醒时根据环境光强度调节屏幕亮度  
 
 ## 编译 & 上传  
 
@@ -53,5 +58,5 @@ Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0
 雷元素图标来自 [Bilibili: 鱼翅翅Kira](https://space.bilibili.com/2292091)
 
 ## 免责声明  
-这段代码仅用作测试，由于滥用造成的一切不好的后果和作者无关。
+这段代码仅用作测试，由于滥用造成的一切不好的后果和作者无关。  
 如果其中的图片素材涉及侵权，请联系我删除。
