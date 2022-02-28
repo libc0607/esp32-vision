@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <title>ESP32Vision</title>
+  <link href="https://cdn.staticfile.org/twitter-bootstrap/5.1.1/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.staticfile.org/twitter-bootstrap/5.1.1/js/bootstrap.bundle.min.js"></script>
+  <script type="text/javascript">
+    function onBodyLoad(){
+      console.log("we are loaded!!");
+    }
+	var timer_status = self.setInterval("status_refresh()", 2000);
+	
+
+	function status_refresh() {
+		console.log("Status refresh");
+		var req = new XMLHttpRequest();
+		req.timeout = 1000;
+		req.open('GET', '/status');
+		req.onload = function() {
+		  if (req.status != 200) { 
+			console.log(`Error ${req.status}: ${req.statusText}`); 
+		  } else { 
+			console.log(`Done, got ${req.response.length} bytes`); 
+			console.log(req.response);
+			document.getElementById("system_status").innerHTML=req.response;
+		  }
+		};
+		req.onerror = function() {
+		  console.log("Request failed");
+		};
+		req.send(null);
+	}
+  </script>
+</head>
+<body id="index" onload="onBodyLoad()">
+
+	<div class="container-fluid p-5 bg-dark text-white text-center">
+	  <h1>ESP32Vision</h1>
+	  <div class="text-center p-3" >
+			<a class="text-secondary" href="https://github.com/libc0607/esp32-vision">Github: libc0607/esp32-vision</a>
+	  </div>
+	  <div class="text-center p-3" >
+			<p class="text-secondary" id="system_status">System status</p>
+	  </div>
+	</div>
+
+	<div class="container mt-5">
+	  <div class="row">
+		<div class="col">
+		  <div class="d-grid">
+			<a href="/edit.htm" class="btn btn-dark btn-block" role="button">文件</a>
+	      </div>
+		</div>
+		<div class="col">
+		  <div class="d-grid">
+			<a href="/ota.htm" class="btn btn-dark btn-block" role="button">更新</a>
+	      </div>     
+		</div>
+	  </div>
+	</div>	
+</body>
+</html>
