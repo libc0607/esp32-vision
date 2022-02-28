@@ -58,7 +58,8 @@ PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://os
 ## 你也可以看看 
 本设计的整体思路是不用一直点亮屏幕，大部分的时候通过深度睡眠省电。但受体积限制和屏幕拖累，续航还是尿崩  
 如果想要常亮的请移步下面 小渣渣 的大电池版  
-https://oshwhub.com/Myzhazha/esp32_pico-d4-video 
+https://oshwhub.com/Myzhazha/esp32_pico-d4-video   
+（他是专业做视频的，元素图标的显示效果比我不知道高到哪里去了（我只会打开待机界面录屏（  
 
 ## 参考 & 引用
 两个软件例子都参考了 [moononournation/RGB565_video](https://github.com/moononournation/RGB565_video)   
