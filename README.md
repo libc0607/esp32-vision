@@ -1,5 +1,6 @@
 # ESP32 神之眼 Genshin Impact Vision
-用 ESP32 做个~~下北泽~~神之眼   
+用 ESP32 做个~~下北泽~~神之眼    
+
 测试视频：  
 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试 - bcccc23333](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
 [Bilibili BV1ir4y1r7ZS: 给刻师傅做个神之眼 - bcccc23333](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
@@ -8,6 +9,7 @@
 
 ![image](https://user-images.githubusercontent.com/8705034/155985863-6c168c1b-9d55-451a-8177-b0d1b43cfb1f.png)  
 
+**警告：如果你没有能够完全理解整个设计的能力，那就不推荐做。**因为我也不知道又会遇到什么坑
 
 ## 硬件特性
  - 1.54 寸 LCD（方版）或 1.28 寸 LCD （圆版）
