@@ -2,7 +2,7 @@
 用 ESP32 做个~~下北泽~~神之眼   
 测试视频：  
 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试 - bcccc23333](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
-[Bilibili BV1Fr4y1z7yS: 给刻师傅做个神之眼 - bcccc23333](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
+[Bilibili BV1ir4y1r7ZS: 给刻师傅做个神之眼 - bcccc23333](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
 
 ![image](https://github.com/libc0607/esp32-vision/raw/main/img/demo-mondstadt-yjsnpi.gif)   
 
