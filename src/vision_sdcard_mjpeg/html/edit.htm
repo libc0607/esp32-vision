@@ -11,7 +11,7 @@
         background-color: #F5F5F5;
         display: none;
         box-shadow: 0 0 10px rgba( 0, 0, 0, .4 );
-        font-size: 12px;
+        font-size: 16px;
         font-family: sans-serif;
         font-weight:bold;
       }
@@ -47,7 +47,7 @@
       }
 
       .css-treeview {
-        font: normal 11px Verdana, Arial, Sans-serif;
+        font: normal 16px Verdana, Arial, Sans-serif;
         -moz-user-select: none;
         -webkit-user-select: none;
         user-select: none;
@@ -254,6 +254,10 @@
         document.getElementById(element).appendChild(treeRoot);
   
         function loadDownload(path){
+		  // a dirty patch
+		  if (path.startsWith("//")) {
+			path = path.substring(1);
+		  }
           document.getElementById('download-frame').src = path+"?download=true";
         }
   
@@ -262,11 +266,21 @@
           preview.style.display = "block";
 		  // a dirty patch
 		  if (path.startsWith("//")) {
-			path = path.substring(1)
+			path = path.substring(1);
 		  }
           preview.innerHTML = '<img src="'+path+'" style="max-width:100%; max-height:100%; margin:auto; display:block;" />';
         }
-  
+		
+		function loadVideoPreview(path){
+          document.getElementById("editor").style.display = "none";
+          preview.style.display = "block";
+		  // a dirty patch
+		  if (path.startsWith("//")) {
+			path = path.substring(1);
+		  }
+          preview.innerHTML = '<video src="'+path+'" style="max-width:100%; max-height:100%; margin:auto; display:block;" controls> Your browser does not support HTML5 Video.</video>';
+        }
+		
         function fillFolderMenu(el, path){
           var list = document.createElement("ul");
           el.appendChild(list);
@@ -338,7 +352,13 @@
               loadPreview(path);
               if(document.body.getElementsByClassName('contextMenu').length > 0) document.body.removeChild(el);
             };
-          }
+          } else if(isVideoFile(path)){
+            action.innerHTML = "<span>Preview</span>";
+            action.onclick = function(e){
+              loadVideoPreview(path);
+              if(document.body.getElementsByClassName('contextMenu').length > 0) document.body.removeChild(el);
+            };
+          } 
           var download = document.createElement("li");
           list.appendChild(download);
           download.innerHTML = "<span>Download</span>";
@@ -378,24 +398,27 @@
         }
   
         function createTreeLeaf(path, name, size){
-          var leaf = document.createElement("li");
-          leaf.id = (((path == "/")?"":path)+"/"+name).toLowerCase();
-          var label = document.createElement("span");
-          label.textContent = name.toLowerCase();
-          leaf.appendChild(label);
-          leaf.onclick = function(e){
-            if(isTextFile(leaf.id)){
-              editor.loadUrl(leaf.id);
-            } else if(isImageFile(leaf.id)){
-              loadPreview(leaf.id);
-            }
-          };
-          leaf.oncontextmenu = function(e){
-            e.preventDefault();
-            e.stopPropagation();
-            showContextMenu(e, leaf.id, true);
-          };
-          return leaf;
+
+		  var leaf = document.createElement("li");
+		  leaf.id = (((path == "/")?"":path)+"/"+name).toLowerCase();
+		  var label = document.createElement("span");
+		  label.textContent = name.toLowerCase();
+		  leaf.appendChild(label);
+		  leaf.onclick = function(e){
+			if(isTextFile(leaf.id)){
+			  editor.loadUrl(leaf.id);
+			} else if(isImageFile(leaf.id)){
+			  loadPreview(leaf.id);
+			} else if(isVideoFile(leaf.id)){
+			  loadVideoPreview(leaf.id);
+			} 
+		  };
+		  leaf.oncontextmenu = function(e){
+			e.preventDefault();
+			e.stopPropagation();
+			showContextMenu(e, leaf.id, true);
+		  };
+		  return leaf;
         }
   
         function createTreeBranch(path, name, disabled){
@@ -433,20 +456,23 @@
         }
   
         function addList(parent, path, items){
+		  var ignore_file_list = ["/index.htm", "/edit.htm", "/ota.htm"];
           var list = document.createElement("ul");
           parent.appendChild(list);
           var ll = items.length;
           for(var i = 0; i < ll; i++){
             var item = items[i];
             var itemEl;
-            if(item.type === "file"){
-              itemEl = createTreeLeaf(path, item.name, item.size);
+            if(item.type === "file" ) {
+			  if (ignore_file_list.indexOf(item.name) === -1) {
+			    itemEl = createTreeLeaf(path, item.name, item.size);
+				list.appendChild(itemEl);
+			  }
             } else {
               itemEl = createTreeBranch(path, item.name);
+			  list.appendChild(itemEl);
             }
-            list.appendChild(itemEl);
           }
-    
         }
   
         function isTextFile(path){
@@ -477,6 +503,30 @@
               case "jpg":
               case "gif":
               case "ico":
+			  case "mjpeg":
+                return true;
+            }
+          }
+          return false;
+        }
+		
+		function isVideoFile(path){
+          var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+          if(typeof ext !== undefined){
+            switch(ext){
+              case "mp4":
+              case "avi":
+                return true;
+            }
+          }
+          return false;
+        }
+		
+		function isMjpegFile(path){
+          var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+          if(typeof ext !== undefined){
+            switch(ext){
+              case "mjpeg":
                 return true;
             }
           }
@@ -570,8 +620,9 @@
           return lang;
         }
   
-        if(typeof file === "undefined") file = "/index.htm";
-  
+        if(typeof file === "undefined") file = "/config.txt";
+		if (file === "/config.txt") lang = "ini";
+		
         if(typeof lang === "undefined"){
           lang = getLangFromFilename(file);
         }
@@ -582,7 +633,9 @@
           type = "text/"+lang;
           if(lang === "c_cpp") type = "text/plain";
         }
-  
+		
+		document.getElementById('editor').style.fontSize='18px';
+		
         var xmlHttp = null;
         var editor = ace.edit(element);
   
@@ -657,7 +710,7 @@
           if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
 		   // a dirty patch
 		  if (file.startsWith("//")) {
-			file = file.substring(1)
+			file = file.substring(1);
 		  }
           httpGet(file);
         }
