@@ -23,6 +23,7 @@
  - 如果电量低，它就也不亮了 （？又废话）
  - 支持每次唤醒时根据环境光强度调节屏幕亮度  
  - 支持通过配置文件选择播放的 mjpeg
+ - 支持通过配置文件设置屏幕方向
  - 支持在网页中 OTA 升级固件
  - 播放掉帧。性能堪忧（
 
@@ -50,12 +51,26 @@
 20. 如果想要再次更改其中内容，只需要将其断电（板上开关）等个十几秒后再接通让它冷启动，即可重复上述相关步骤。
 
 ## 自定义配置 
-代码中有几个可以配置的地方（其中一部分可能在日后（如果有，咕）的版本中移入配置文件）： 
+
+配置文件 /sdcard/config.txt 中的可自定义内容：   
+
+```
+ [vision]
+ video=/loop.mjpeg       # 要播放的文件名。需要以 / 开头，并且文件名不要太长不然会出bug
+ lcd_rotation=0          # LCD 的方向。取值范围 0~3，对应 0°, 90°, 180°, 270°，根据实际情况修改
+ target_fps=15           # 播放该视频时的目标 FPS。如果实际的解码能力高于这个值则会按照这个值显示，反之会跳帧
+```
+
+如果你想恢复默认值，只需要删除 /sdcard/config.txt 并重启即可，会生成一个新的默认配置的文件。  
+
+代码中有几个可以配置的地方（其中一部分可能在日后（如果有，咕）的版本中移入配置文件）：  
 ```
 
 // 系统配置
 #define CONFIG_FILENAME "/config.txt"       // SD Nand 根目录中的配置文件的名称。该文件如果不存在会自动生成。 
 #define CONF_GIFNAME_DEFAULT "/loop.mjpeg"  // 配置文件中的默认循环播放的文件名。另外，如果工作时检测到配置文件无效，作为默认，会尝试播放这个文件名。
+#define CONF_LCD_ROTATION_DEFAULT  0        // LCD 的默认旋转方向，可以在配置文件中修改
+#define CONF_TARGET_FPS_DEFAULT 15          // 默认的目标 FPS。如果解码能力高于这个值则会按照这个值显示，反之会跳帧。可以在配置文件中修改
 #define DEEP_SLEEP_SHORT_S  6               // 在最近一次敲击唤醒之后的 DEEP_SLEEP_SHORT_CNT 次睡眠前，会设置定时器使用 DEEP_SLEEP_SHORT_S 作为唤醒延时；否则使用 DEEP_SLEEP_LONG_S
 #define DEEP_SLEEP_SHORT_CNT  6             // 每次检测到敲击唤醒后重置计数器
 #define DEEP_SLEEP_LONG_S   30              // DEEP_SLEEP_LONG_S 和 DEEP_SLEEP_SHORT_S 是定时器唤醒的时间，单位是秒
@@ -64,7 +79,7 @@
 
 // 屏幕选择
 //Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true);
-Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0);
+Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
                                             // 在这里选择你的屏幕种类
 
 // 网络设置
@@ -72,11 +87,6 @@ const char* wifi_ssid = "Celestia";         // 冷启动时尝试连接的 Wi-Fi
 const char* wifi_pwd = "mimitomo";
 #define WIFI_CONNECT_TIMEOUT_S 20           // 冷启动时尝试连接 Wi-Fi 的时间上限，单位为秒。超过这个时间还没有连接成功则直接进入正常工作
 const char* wifi_host = "vision";           // MDNS 主机名。这样设置得到的结果形如 vision.local                             
-
-
-// 以后会改的
-#define FPS 24                              // 目标 FPS。但它根本达不到。草
-
 
 ```
 ## 参考 
