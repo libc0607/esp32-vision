@@ -1,6 +1,6 @@
 /*
    Vision V3.2 SD MJPEG WebServer OTA DEMO
-   Github: libc0607/esp32-lcd-vision
+   Github: libc0607/esp32-vision
 
    ref:
    https://github.com/moononournation/RGB565_video 
@@ -30,7 +30,8 @@
     # Auto generated config file
     [vision]
     video=/loop.mjpeg
-
+    lcd_rotation=0
+    target_fps=15
 
    This is just an EARLY DEMO to verify all parts of the
    hardware can work properly.
@@ -44,6 +45,9 @@ const char* wifi_ssid = "Celestia";
 const char* wifi_pwd = "mimitomo";
 const char* wifi_host = "vision";
 #define CONF_GIFNAME_DEFAULT "/loop.mjpeg"
+#define CONF_TARGET_FPS_DEFAULT 15
+//#define CONF_GRAVITY_DEFAULT  true
+#define CONF_LCD_ROTATION_DEFAULT  0
 #define DEEP_SLEEP_LONG_S  30
 #define DEEP_SLEEP_SHORT_S  6
 #define DEEP_SLEEP_SHORT_CNT  6
@@ -99,12 +103,13 @@ const char* wifi_host = "vision";
 #define BAT_ADC_THRESH_WARN  (1880)  // analogRead( 1/2*Vbat )
 #define SENSOR_DISWIFI_THRESH_8B  10
 #define ACCE_DISWIFI_Z_THRESH  850 // while g~980
-#define FPS 24                     // but still lots of frame skipped. haiyaa why r u so weak
+#define ACCE_ORIENTATION_THRESH 850
+//#define FPS 24                     // but still lots of frame skipped. haiyaa why r u so weak
 #define MJPEG_BUFFER_SIZE (240 * 240 * 2 / 4)
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_TFT_DC/* DC */, PIN_TFT_CS /* CS */, PIN_SCK, PIN_MOSI, PIN_MISO, VSPI, true );
 //Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
-Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0);
+Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
 
 DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 
@@ -569,6 +574,9 @@ void setup()
 {
   int i;
   String conf_gifname = CONF_GIFNAME_DEFAULT;
+  int conf_target_fps = CONF_TARGET_FPS_DEFAULT;
+//  bool conf_gravity = CONF_GRAVITY_DEFAULT;
+  int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
@@ -713,6 +721,9 @@ void setup()
     if (conf_file) {
       conf_file.println("[vision]");
       conf_file.print("video="); conf_file.println(CONF_GIFNAME_DEFAULT);
+//      conf_file.print("gravity="); conf_file.println(CONF_GRAVITY_DEFAULT? "true": "false"); 
+      conf_file.print("target_fps="); conf_file.println(CONF_TARGET_FPS_DEFAULT);
+      conf_file.print("lcd_rotation="); conf_file.println(CONF_LCD_ROTATION_DEFAULT);
       conf_file.close();
     }
   }
@@ -736,10 +747,40 @@ void setup()
     Serial.print("<vision.video> not found; use vision.video.default=");
     Serial.println(conf_gifname);
   }
+/*
+  if (ini.getValue("vision", "gravity", conf_buf, buf_len, conf_gravity)) {
+    Serial.print("vision.gravity=");
+    Serial.println(conf_gravity ? "true" : "false");
+  } else {
+    printErrorMessage(ini.getError());
+    Serial.print("<vision.gravity> not found; use vision.gravity.default=");
+    Serial.println(conf_gravity ? "true" : "false");
+  }
+*/
+  if (ini.getValue("vision", "lcd_rotation", conf_buf, buf_len)) {
+    conf_lcd_rotation = String(conf_buf).toInt();
+    Serial.print("vision.lcd_rotation=");
+    Serial.println(conf_lcd_rotation);
+  } else {
+    printErrorMessage(ini.getError());
+    Serial.print("<vision.lcd_rotation> not found; use vision.target_fps.default=");
+    Serial.println(conf_lcd_rotation);
+  }
+  if (ini.getValue("vision", "target_fps", conf_buf, buf_len)) {
+    conf_target_fps = String(conf_buf).toInt();
+    Serial.print("vision.target_fps=");
+    Serial.println(conf_target_fps);
+  } else {
+    printErrorMessage(ini.getError());
+    Serial.print("<vision.target_fps> not found; use vision.target_fps.default=");
+    Serial.println(conf_target_fps);
+  }
 
-
+   
   if (rst_reason == DEEPSLEEP_RESET) {
-
+    
+    gfx->setRotation(conf_lcd_rotation);
+    
     // wakeup by accel. or timer
     // play GIF
     ledcWrite(1, lcd_brightness);  // brightness
@@ -764,7 +805,7 @@ void setup()
         Serial.println(F("MJPEG video start"));
         start_ms = millis();
         curr_ms = millis();
-        next_frame_ms = start_ms + (++next_frame * 1000 / FPS / 2);
+        next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps / 2);
         mjpeg.setup(vFile, mjpeg_buf, (Arduino_TFT *)gfx, false);
         unsigned long start = millis();
 
@@ -786,7 +827,7 @@ void setup()
           }
 
           curr_ms = millis();
-          next_frame_ms = start_ms + (++next_frame * 1000 / FPS);
+          next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps);
           SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
         }
         Serial.println(F("MJPEG video end"));
