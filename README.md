@@ -72,8 +72,9 @@ https://oshwhub.com/Myzhazha/esp32_pico-d4-video
 如果还有遗漏请指出谢谢茄子  
 
 ## 许可
-本设计采用 [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0) 许可。  
-我不卖，但你当然可以自己做一个玩；NC 是为了防止潜在的mhy法务部警告（？）。
+本设计采用 [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0) 许可。（OSHWHub 上只能选 3.0 ..）  
+我不卖，但你当然可以自己做一个玩；NC 是为了防止潜在的mhy法务部警告（？）。  
+如果你还是充满好奇，可以看看 [《原神同人周边大陆地区正式运行指引V1.2》](https://weibo.com/ttarticle/p/show?id=2309404707028085113324)
 
 ## 免责声明  
 这东西仅为个人 DIY 项目，作者不保证所公开的内容绝对可用，也不可能解决所有出现的问题。  
