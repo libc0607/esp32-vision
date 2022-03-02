@@ -77,10 +77,12 @@
 #define BAT_ADC_THRESH_LOW  1700            // 低电压保护。当每一轮工作开始时，如果 ADC 读取到的电压读数低于这个值，就不会播放 GIF，直接进入下一轮睡眠
                                             // 由于 ESP32 的 ADC 质量不咋样，所以没有换算成电压。你可以根据自己板子的情况尝试调节这个值。  
 
-// 屏幕选择
+// 屏幕配置
 //Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true);
 Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
                                             // 在这里选择你的屏幕种类
+#define LCD_BACKLIGHT_MIN_8B  16            // 屏幕背光的最低亮度，范围为 8bit（即最大值为 255）。
+                                            // 每次运行时，程序将从环境光传感器那里得到的光强度 Map 到 LCD_BACKLIGHT_MIN_8B ~ 255 区间内，作为背光 PWM 的占空比。
 
 // 网络设置
 const char* wifi_ssid = "Celestia";         // 冷启动时尝试连接的 Wi-Fi 名称和密码
