@@ -59,7 +59,7 @@ PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://os
 
 ## 你也可以看看 
 本设计的整体思路是不用一直点亮屏幕，大部分的时候通过深度睡眠省电。但受体积限制和屏幕拖累，续航还是尿崩  
-如果想要常亮的请移步下面 小渣渣 的大电池版  
+如果想要常亮的请移步下面 小渣渣 的大电池版，他的其余部分的设计基于 GPL 3.0 开源  
 https://oshwhub.com/Myzhazha/esp32_pico-d4-video   
 （他是专业做视频的，元素图标的显示效果比我不知道高到哪里去了（我只会打开待机界面录屏（  
 
@@ -73,7 +73,7 @@ https://oshwhub.com/Myzhazha/esp32_pico-d4-video
 
 ## 许可
 本设计采用 [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0) 许可。（OSHWHub 上只能选 3.0 ..）  
-我不卖，但你当然可以自己做一个玩；NC 是为了防止潜在的mhy法务部警告（？）。  
+我不卖成品，也不以任何形式卖套件，没精力搞。。但作为开源项目，你当然可以在遵守开源协议的情况下自己做一个玩；NC 是为了防止潜在的mhy法务部警告（？）。  
 如果你还是充满好奇，可以看看 [《原神同人周边大陆地区正式运行指引V1.2》](https://weibo.com/ttarticle/p/show?id=2309404707028085113324)
 
 ## 免责声明  
