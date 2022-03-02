@@ -52,6 +52,8 @@ const char* wifi_host = "vision";
 #define DEEP_SLEEP_SHORT_S  6
 #define DEEP_SLEEP_SHORT_CNT  6
 #define TEMP_PROTECT_HIGH_THRESH_12B  1840 // ~60°C @10k,B3380
+#define LCD_BACKLIGHT_MIN_8B  16
+
 
 #define FILE_SYSTEM  SD
 
@@ -108,8 +110,8 @@ const char* wifi_host = "vision";
 #define MJPEG_BUFFER_SIZE (240 * 240 * 2 / 4)
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_TFT_DC/* DC */, PIN_TFT_CS /* CS */, PIN_SCK, PIN_MOSI, PIN_MISO, VSPI, true );
-//Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
-Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
+Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
+//Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
 
 DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 
@@ -673,11 +675,12 @@ void setup()
   light_sens_norm = pow(light_sens_norm, 2.0);
   ledcAttachPin(PIN_TFT_BL, 1);
   ledcSetup(1, 12000, 8);
-  lcd_brightness = int(light_sens_norm * 224.0) + 31;
+  lcd_brightness = int(light_sens_norm * float(255-LCD_BACKLIGHT_MIN_8B)) + LCD_BACKLIGHT_MIN_8B;
   Serial.print("lcd_brightness: ");
   Serial.println(lcd_brightness);
   gfx->fillScreen(BLACK);
-
+  digitalWrite(PIN_TFT_CS, HIGH);
+  
   SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_SD_CS);
   //SPIClass spi = SPIClass(HSPI);
   //spi.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_SD_CS);
@@ -828,6 +831,7 @@ void setup()
 
           curr_ms = millis();
           next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps);
+          
           SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
         }
         Serial.println(F("MJPEG video end"));
@@ -884,7 +888,7 @@ void setup()
       }
       MDNS.addService("http", "tcp", 80);
 
-      ledcWrite(1, lcd_brightness/2);  // brightness
+      ledcWrite(1, LCD_BACKLIGHT_MIN_8B);  // brightness
       gfx->begin();
       gfx->fillScreen(BLUE);
       SD.begin(PIN_SD_CS);
@@ -917,7 +921,7 @@ void loop()
             if (abs(acce.readAccZ()) > ACCE_DISWIFI_Z_THRESH ) {
               Serial.println(F("init done, deep sleep now"));
               gfx->begin();
-              ledcWrite(1, 32);
+              ledcWrite(1, LCD_BACKLIGHT_MIN_8B);
               gfx->fillScreen(GREEN); // 绿一下 提醒一下
               delay(500);
               gfx->fillScreen(BLACK);
