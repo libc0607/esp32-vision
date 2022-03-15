@@ -4,6 +4,7 @@
 测试视频：  
 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试 - bcccc23333](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
 [Bilibili BV1ir4y1r7ZS: 给刻师傅做个神之眼 - bcccc23333](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
+[BV1hS4y1D7fo：蒙德外壳+圆版 测试](https://www.bilibili.com/video/BV1hS4y1D7fo)  
 
 ![image](https://github.com/libc0607/esp32-vision/raw/main/img/demo-mondstadt-yjsnpi.gif)   
 
@@ -17,21 +18,23 @@
  - 内部显示的内容作为图片或者视频存在，可以在 SPIFFS 或 SD Nand 中存放图片/视频， 理论上可以 128M ~ 8G  
  - 内置 LIS2DW12 加速度传感器，支持敲击识别，但重力感应功能还没写  
  - 外壳预留 TEMT6000 环境光强度传感器位置，自动调光（但只是 PWM）
- - 锂电池充电管理使用 CN3165，带有 NTC 保护 （我可不是在暗示某充电宝啊（；由于忘了留电阻位，高压锂电池的充电大概会是下一版
- - 低功耗 DC-DC 降压 ETA3425
+ - 锂电池充电管理使用 CN3165，带有 NTC 保护，支持 4.2V/4.35V/4.4V
+ - 低功耗 DC-DC 降压 ETA3425，低电量时 100% 导通，即断电电压由锂电池保护板决定  
  - 用了一个 SY6280AAC 让屏和 SD Nand 支持断电 
- - 支持且仅支持无线充电，需要外接无线充电模块并将线圈贴在外壳上；配套使用 华为 GT2 Pro 的无线充电座即可充电，淘宝大概卖 29
+ - 支持且仅支持无线充电，需要外接无线充电模块并将线圈贴在外壳上；配套使用 华为 GT2 Pro 的无线充电座即可充电，淘宝大概卖 29  
+ - V3.3 版本增加一个按键，长按开关机，短按可被 ESP32 识别，但代码还没写
 
 ## PCB 设计  
-PCB 圆版：[OSHWHub: libc0607/esp32_vision_v3-2_gc9a01_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_gc9a01_rel)   
+PCB 圆版：  
+V3.2: [OSHWHub: libc0607/esp32_vision_v3-2_gc9a01_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_gc9a01_rel)    
+V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_gc9a01_rel](https://oshwhub.com/libc0607/esp32_vision_v3-3_gc9a01_rel)  
 
-![image](https://user-images.githubusercontent.com/8705034/155985414-dc29f2b3-72e8-4fcf-86e9-d311e2b08795.png)  
+![image](https://user-images.githubusercontent.com/8705034/158412090-078fbdf3-1522-4b3c-a5c7-30ed71a7bd47.png)  
 
 PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_liyuev3_st7789_rel)   
 
 ![image](https://user-images.githubusercontent.com/8705034/155985375-e8274fe1-dd50-4bb7-a1be-882611fffcee.png)  
 
-下一版本将会去掉那个弱智开关，可能还会加个灯，在画了咕咕咕.jpg  
 
 ## 软件
 目前做了两版测试代码，可以实现基本功能，但都不算正式 Release。有待填坑   
@@ -61,7 +64,14 @@ PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://os
 本设计的整体思路是不用一直点亮屏幕，大部分的时候通过深度睡眠省电。但受体积限制和屏幕拖累，续航还是尿崩  
 如果想要常亮的请移步下面 小渣渣 的大电池版，他的其余部分的设计基于 GPL 3.0 开源  
 https://oshwhub.com/Myzhazha/esp32_pico-d4-video   
-（他是专业做视频的，元素图标的显示效果比我不知道高到哪里去了（我只会打开待机界面录屏（  
+（他是专业做视频的，元素图标的显示效果比我不知道高到哪里去了（我只会打开待机界面录屏（   
+
+关于我的设计和他的设计的关系：  
+ - 电路部分各做各的，不过也有相互参考   
+ - 程序部分各做各的  
+ - 他的 GC9A01 版蒙德外壳基于我的修改  
+ - 他后续会卖电路套件（不含外壳），我不对外卖，所以想买的去找他  
+
 
 ## 参考 & 引用
 两个软件例子都参考了 [moononournation/RGB565_video](https://github.com/moononournation/RGB565_video)   
