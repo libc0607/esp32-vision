@@ -1,5 +1,5 @@
 /*
-   Vision V3.2 SD MJPEG WebServer OTA DEMO
+   Vision V3.3 SD MJPEG WebServer OTA DEMO
    Github: libc0607/esp32-vision
 
    ref:
@@ -27,7 +27,6 @@
 
    Config ini example:
 
-    # Auto generated config file
     [vision]
     video=/loop.mjpeg
     lcd_rotation=0
@@ -98,6 +97,8 @@ const char* wifi_host = "vision";
 #define PIN_SENSOR_ADC  34    // light sensor (temt6000), to GND if not connected
 #define PIN_I2C_SCL     25    // to accelerometer
 #define PIN_I2C_SDA     26    // to accelerometer
+#define PIN_LED         23    // ext. led
+#define PIN_KEY         18    // ext. key
 
 #define WIFI_CONNECT_TIMEOUT_S 20
 #define uS_TO_S_FACTOR (1000000ULL)
@@ -134,7 +135,8 @@ uint8_t lcd_brightness;
 
 RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR int lastTappedCount = 0;
-
+RTC_DATA_ATTR int lastKeyDownCount = 0;
+RTC_DATA_ATTR uint8_t lcd_brightness_by_key = LCD_BACKLIGHT_MIN_8B;
 
 void set_io_before_deep_sleep() {
 
@@ -158,6 +160,9 @@ void set_io_before_deep_sleep() {
   pinMode(PIN_ACC_INT1, INPUT);
   pinMode(PIN_BAT_STDBY, INPUT);
   pinMode(PIN_BAT_CHRG, INPUT);
+
+  pinMode(PIN_KEY, INPUT_PULLUP);
+  pinMode(PIN_LED, INPUT);
   
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_ACC_INT1 , HIGH);
   //esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_BAT_STDBY , LOW);
@@ -572,6 +577,10 @@ void printErrorMessage(uint8_t e, bool eol = true) {
     Serial.println();
 }
 
+uint8_t get_lcd_brightness_by_adc (int adc_pin) {
+  return uint8_t(( pow((analogRead(adc_pin)/4096.0), 2.0) * float(255-LCD_BACKLIGHT_MIN_8B) ) + LCD_BACKLIGHT_MIN_8B);
+}
+
 void setup()
 {
   int i;
@@ -579,18 +588,24 @@ void setup()
   int conf_target_fps = CONF_TARGET_FPS_DEFAULT;
 //  bool conf_gravity = CONF_GRAVITY_DEFAULT;
   int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
+  int last_key_state = HIGH;
+  int key_state = HIGH;
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
   Serial.begin(115200);
-  Serial.print("Vision v3.2, SD MJPEG WebServer OTA demo; bootcounter: "); Serial.print(bootCount);
-  Serial.print(", lastTapped: "); Serial.println(lastTappedCount);
+  Serial.print("Vision v3.3, SD MJPEG WebServer OTA demo; bootcounter: "); Serial.print(bootCount);
+  Serial.print(", lastTapped: "); Serial.print(lastTappedCount);
+  Serial.print(", lastKeyDown: "); Serial.println(lastKeyDownCount);
 
   // disable all PAD HOLD
   gpio_deep_sleep_hold_dis();
   gpio_hold_dis(( gpio_num_t ) PIN_LCD_PWR_EN );
   pinMode(PIN_LCD_PWR_EN, OUTPUT);
-
+  pinMode(PIN_KEY, INPUT_PULLUP);
+  pinMode(PIN_LED, OUTPUT);
+  digitalWrite(PIN_LED, LOW); // startup blink
+  
   // find out why we are working
   RESET_REASON rst_reason = rtc_get_reset_reason(0);
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -669,15 +684,14 @@ void setup()
     gfx->fillScreen(BLACK);
   }
   delay(200);
+
   
-  float light_sens = analogRead(PIN_SENSOR_ADC);
-  float light_sens_norm = light_sens / 4096.0;
-  light_sens_norm = pow(light_sens_norm, 2.0);
   ledcAttachPin(PIN_TFT_BL, 1);
   ledcSetup(1, 12000, 8);
-  lcd_brightness = int(light_sens_norm * float(255-LCD_BACKLIGHT_MIN_8B)) + LCD_BACKLIGHT_MIN_8B;
-  Serial.print("lcd_brightness: ");
-  Serial.println(lcd_brightness);
+  lcd_brightness = get_lcd_brightness_by_adc(PIN_SENSOR_ADC);
+  if (bootCount < 3) {
+    lcd_brightness_by_key = lcd_brightness; // 这。。我有预感 又要变成屎山了
+  }
   gfx->fillScreen(BLACK);
   digitalWrite(PIN_TFT_CS, HIGH);
   
@@ -779,15 +793,25 @@ void setup()
     Serial.println(conf_target_fps);
   }
 
-   
+  digitalWrite(PIN_LED, HIGH); // startup blink 
+  
   if (rst_reason == DEEPSLEEP_RESET) {
     
     gfx->setRotation(conf_lcd_rotation);
     
     // wakeup by accel. or timer
     // play GIF
-    ledcWrite(1, lcd_brightness);  // brightness
-
+    
+    if (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT) {
+      ledcWrite(1, lcd_brightness_by_key); 
+      Serial.print("lcd_brightness: by key, ");
+      Serial.println(lcd_brightness_by_key);
+    } else {
+      ledcWrite(1, lcd_brightness); 
+      Serial.print("lcd_brightness: by adc, ");
+      Serial.println(lcd_brightness);
+    }
+  
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
       Serial.println("wakeup by ext0");
       lastTappedCount = bootCount;
@@ -833,12 +857,22 @@ void setup()
           next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps);
           
           SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
+          
+          // check key
+          digitalWrite(PIN_LED, digitalRead(PIN_KEY)); // sync LED to key
+          last_key_state = key_state;
+          key_state = digitalRead(PIN_KEY);
+          if (last_key_state == LOW && key_state == LOW) {  
+            lastTappedCount = bootCount;
+            lcd_brightness_by_key = get_lcd_brightness_by_adc(PIN_SENSOR_ADC);
+            lastKeyDownCount = bootCount;
+          }
         }
         Serial.println(F("MJPEG video end"));
         vFile.close();
       }
     }
-
+    digitalWrite(PIN_LED, HIGH);
     Serial.println(F("deep sleep"));
     ledcWrite(1, 0);
     ledcDetachPin(PIN_TFT_BL);
@@ -859,15 +893,26 @@ void setup()
     WiFi.begin(wifi_ssid, wifi_pwd);
 
     int wifi_cnt = 0;
+    int wifi_led_status = HIGH;
     while (WiFi.status() != WL_CONNECTED ) {
-      delay(500);
+      digitalWrite(PIN_LED, wifi_led_status);
+      wifi_led_status = (wifi_led_status == HIGH)? LOW: HIGH;
+      delay(250);
       Serial.print(".");
       wifi_cnt++;
-      if (wifi_cnt > 2 * WIFI_CONNECT_TIMEOUT_S) {
+      if (wifi_cnt > 4 * WIFI_CONNECT_TIMEOUT_S) {
         Serial.println("WiFi timeout");
         break;
       }
+      if (digitalRead(PIN_KEY) == LOW) {
+        delay(20);
+        if (digitalRead(PIN_KEY) == LOW) {
+          Serial.println("Wi-Fi skipped by key");
+          break;
+        }
+      }
     }
+    digitalWrite(PIN_LED, HIGH);
     server.on("/status", HTTP_GET, getStatus);
     server.on("/list", HTTP_GET, printDirectory);
     server.on("/edit", HTTP_DELETE, handleDelete);
