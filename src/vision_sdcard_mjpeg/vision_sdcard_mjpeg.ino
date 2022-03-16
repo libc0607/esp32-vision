@@ -52,6 +52,7 @@ const char* wifi_host = "vision";
 #define DEEP_SLEEP_SHORT_CNT  6
 #define TEMP_PROTECT_HIGH_THRESH_12B  1840 // ~60°C @10k,B3380
 #define LCD_BACKLIGHT_MIN_8B  16
+#define LCD_PWM_FIR_LEN 8
 
 
 #define FILE_SYSTEM  SD
@@ -126,7 +127,8 @@ unsigned long total_sd_mjpeg = 0;
 unsigned long total_decode_video = 0;
 unsigned long total_remain = 0;
 unsigned long start_ms, curr_ms, next_frame_ms;
-
+uint8_t lcd_pwm_filter[LCD_PWM_FIR_LEN] = {LCD_BACKLIGHT_MIN_8B};
+uint8_t p_lcd_pwm_filter;
 
 WebServer server(80);
 static bool hasSD = false;
@@ -581,6 +583,21 @@ uint8_t get_lcd_brightness_by_adc (int adc_pin) {
   return uint8_t(( pow((analogRead(adc_pin)/4096.0), 2.0) * float(255-LCD_BACKLIGHT_MIN_8B) ) + LCD_BACKLIGHT_MIN_8B);
 }
 
+uint8_t lcd_pwm_fir_filter (uint8_t pwm_val) {
+  uint32_t lcd_pwm_filter_sum;
+  
+  lcd_pwm_filter[p_lcd_pwm_filter] = pwm_val;
+  p_lcd_pwm_filter++;
+  if (p_lcd_pwm_filter == sizeof(lcd_pwm_filter)) {
+    p_lcd_pwm_filter = 0;
+  }
+  for (int i=0; i<sizeof(lcd_pwm_filter); i++) {
+    lcd_pwm_filter_sum += lcd_pwm_filter[i];
+  }
+  
+  return (lcd_pwm_filter_sum/sizeof(lcd_pwm_filter));
+}
+
 void setup()
 {
   int i;
@@ -590,6 +607,7 @@ void setup()
   int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
   int last_key_state = HIGH;
   int key_state = HIGH;
+
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
@@ -636,13 +654,6 @@ void setup()
   pinMode(PIN_ACC_INT1, INPUT);
   pinMode(PIN_BAT_STDBY, INPUT);
   pinMode(PIN_BAT_CHRG, INPUT);
-
-  
-  if (bootCount - lastTappedCount < DEEP_SLEEP_SHORT_CNT) {
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SHORT_S * uS_TO_S_FACTOR);
-  } else {
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_LONG_S * uS_TO_S_FACTOR);
-  }
   
   // check battery voltage & temperature
   uint32_t battery_voltage_adc = analogRead(PIN_ADC_BAT);
@@ -652,6 +663,7 @@ void setup()
   if (battery_voltage_adc < BAT_ADC_THRESH_LOW) {
     // just go sleep if battery low
     Serial.println("battery low, deep sleep start");
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_LONG_S * uS_TO_S_FACTOR);
     set_io_before_deep_sleep();
     esp_deep_sleep_start();
   } 
@@ -689,6 +701,10 @@ void setup()
   ledcAttachPin(PIN_TFT_BL, 1);
   ledcSetup(1, 12000, 8);
   lcd_brightness = get_lcd_brightness_by_adc(PIN_SENSOR_ADC);
+  for (i=0; i<sizeof(lcd_pwm_filter); i++) {
+    lcd_pwm_filter[i] = lcd_brightness;
+  }
+  p_lcd_pwm_filter = 0;
   if (bootCount < 3) {
     lcd_brightness_by_key = lcd_brightness; // 这。。我有预感 又要变成屎山了
   }
@@ -801,12 +817,13 @@ void setup()
     
     // wakeup by accel. or timer
     // play GIF
-    
-    if (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT) {
+
+    bool lcd_use_mem = (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT);
+    if (lcd_use_mem) {
       ledcWrite(1, lcd_brightness_by_key); 
       Serial.print("lcd_brightness: by key, ");
       Serial.println(lcd_brightness_by_key);
-    } else {
+    } else {  // use adc
       ledcWrite(1, lcd_brightness); 
       Serial.print("lcd_brightness: by adc, ");
       Serial.println(lcd_brightness);
@@ -867,6 +884,11 @@ void setup()
             lcd_brightness_by_key = get_lcd_brightness_by_adc(PIN_SENSOR_ADC);
             lastKeyDownCount = bootCount;
           }
+
+          // sync lcd brightness
+          if (!lcd_use_mem) {
+            ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
+          }
         }
         Serial.println(F("MJPEG video end"));
         vFile.close();
@@ -878,6 +900,11 @@ void setup()
     ledcDetachPin(PIN_TFT_BL);
     delay(20);
     gfx->displayOff();
+    if (bootCount - lastTappedCount < DEEP_SLEEP_SHORT_CNT) {
+      esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SHORT_S * uS_TO_S_FACTOR);
+    } else {
+      esp_sleep_enable_timer_wakeup(DEEP_SLEEP_LONG_S * uS_TO_S_FACTOR);
+    }
 
     set_io_before_deep_sleep();
     esp_deep_sleep_start();
@@ -947,13 +974,23 @@ void setup()
 
 void loop()
 {
+  bool exit_loop = false;
+  
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
     delay(2);//allow the cpu to switch to other tasks
-
+    
+    ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
+    
     // 退出webserver进入深睡条件：
-    // 双击 & 盖住光传感器（或无光）& 屏幕水平放置
+    // (双击 & 盖住光传感器（或无光）& 屏幕水平放置) || (按下按键)
     // 不满足的话都不会退出
+    if (digitalRead(PIN_KEY) == LOW) {
+      delay(20);
+      if (digitalRead(PIN_KEY) == LOW) {
+        exit_loop = true;
+      }
+    }
     if (digitalRead(PIN_ACC_INT1) == HIGH) {
       DFRobot_LIS2DW12:: eTap_t tapEvent = acce.tapDetect();
       if (tapEvent == DFRobot_LIS2DW12::eDTap) {
@@ -964,21 +1001,7 @@ void loop()
           light_level = int(pow((analogRead(PIN_SENSOR_ADC) / 4096.0), 2.0) * 255.0);
           if (SENSOR_DISWIFI_THRESH_8B > light_level) {
             if (abs(acce.readAccZ()) > ACCE_DISWIFI_Z_THRESH ) {
-              Serial.println(F("init done, deep sleep now"));
-              gfx->begin();
-              ledcWrite(1, LCD_BACKLIGHT_MIN_8B);
-              gfx->fillScreen(GREEN); // 绿一下 提醒一下
-              delay(500);
-              gfx->fillScreen(BLACK);
-              for (int i = lcd_brightness; i >= 0; i--) {
-                ledcWrite(1, i);
-                delay(1);
-              }
-              ledcDetachPin(PIN_TFT_BL);
-              delay(20);
-              gfx->displayOff();
-              set_io_before_deep_sleep();
-              esp_deep_sleep_start();
+              exit_loop = true;
             }
           }
         }
@@ -987,10 +1010,26 @@ void loop()
   } else {
     // 如果没有连接就进到loop，说明 a.前面尝试连接wifi炒屎了 或 b.wifi断开了
     // 就直接睡眠了准备正常工作
-    Serial.println(F("init done, deep sleep now"));
-    ledcDetachPin(PIN_TFT_BL);
-    gfx->displayOff();
-    set_io_before_deep_sleep();
-    esp_deep_sleep_start();
+    exit_loop = true;
   }
+
+  if (exit_loop) {
+    Serial.println(F("init done, deep sleep now"));
+    gfx->begin();
+    ledcWrite(1, LCD_BACKLIGHT_MIN_8B);
+    gfx->fillScreen(GREEN); // 绿一下 提醒一下
+    delay(500);
+    gfx->fillScreen(BLACK);
+    for (int i = lcd_brightness; i >= 0; i--) {
+      ledcWrite(1, i);
+      delay(1);
+    }
+    ledcDetachPin(PIN_TFT_BL);
+    delay(20);
+    gfx->displayOff();
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SHORT_S * uS_TO_S_FACTOR);
+    set_io_before_deep_sleep();
+    esp_deep_sleep_start();        
+  }
+  
 }
