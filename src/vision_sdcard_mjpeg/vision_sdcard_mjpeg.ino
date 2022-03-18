@@ -134,6 +134,7 @@ WebServer server(80);
 static bool hasSD = false;
 File uploadFile;
 uint8_t lcd_brightness;
+int led_status;
 
 RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR int lastTappedCount = 0;
@@ -247,12 +248,15 @@ void handleFileUpload() {
   if (!filename.startsWith("/"))
     filename = "/" + filename;
   if (upload.status == UPLOAD_FILE_START) {
+    gfx->fillScreen(ORANGE);SD.begin(PIN_SD_CS);
     if (FILE_SYSTEM.exists(filename)) {
       FILE_SYSTEM.remove(filename);
     }
     uploadFile = FILE_SYSTEM.open(filename, FILE_WRITE);
     Serial.print("Upload: START, filename: "); Serial.println(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
+    led_status = (led_status == HIGH)? LOW: HIGH;
+    digitalWrite(PIN_LED, led_status);
     if (uploadFile) {
       uploadFile.write(upload.buf, upload.currentSize);
     }
@@ -261,6 +265,7 @@ void handleFileUpload() {
     if (uploadFile) {
       uploadFile.close();
     }
+    gfx->fillScreen(BLUE);SD.begin(PIN_SD_CS);
     Serial.print("Upload: END, Size: "); Serial.println(upload.totalSize);
   }
 }
@@ -461,7 +466,7 @@ void handleOTAresult() {
   delay(200);
   ESP.restart();
 }
-
+  
 void handleOTA() {
   Serial.println("Start OTA Update");
   HTTPUpload& upload = server.upload();
@@ -474,6 +479,8 @@ void handleOTA() {
       Update.printError(Serial);
     }
   } else if (upload.status == UPLOAD_FILE_WRITE) {
+    led_status = (led_status == HIGH)? LOW: HIGH;
+    digitalWrite(PIN_LED, led_status);
     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
       Update.printError(Serial);
     }
@@ -818,7 +825,7 @@ void setup()
     // wakeup by accel. or timer
     // play GIF
 
-    bool lcd_use_mem = (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT);
+    bool lcd_use_mem = (bootCount >= DEEP_SLEEP_SHORT_CNT) && (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT);
     if (lcd_use_mem) {
       ledcWrite(1, lcd_brightness_by_key); 
       Serial.print("lcd_brightness: by key, ");
@@ -910,7 +917,8 @@ void setup()
     esp_deep_sleep_start();
 
   } else {
-
+    gfx->begin();
+    gfx->fillScreen(LIGHTGREY);SD.begin(PIN_SD_CS);
     // poweron reset, start wi-fi ap
     Serial.println("Power on reset (maybe); ");
     Serial.print("Start ");
@@ -918,12 +926,12 @@ void setup()
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_MINUS_1dBm);
     WiFi.begin(wifi_ssid, wifi_pwd);
-
+    ledcWrite(1, LCD_BACKLIGHT_MIN_8B);  // brightness
+    
     int wifi_cnt = 0;
-    int wifi_led_status = HIGH;
     while (WiFi.status() != WL_CONNECTED ) {
-      digitalWrite(PIN_LED, wifi_led_status);
-      wifi_led_status = (wifi_led_status == HIGH)? LOW: HIGH;
+      digitalWrite(PIN_LED, led_status);
+      led_status = (led_status == HIGH)? LOW: HIGH;
       delay(250);
       Serial.print(".");
       wifi_cnt++;
@@ -959,11 +967,8 @@ void setup()
         Serial.println("Error setting up MDNS responder!");
       }
       MDNS.addService("http", "tcp", 80);
-
-      ledcWrite(1, LCD_BACKLIGHT_MIN_8B);  // brightness
-      gfx->begin();
-      gfx->fillScreen(BLUE);
-      SD.begin(PIN_SD_CS);
+      
+      gfx->fillScreen(BLUE); SD.begin(PIN_SD_CS);
     } else {
       // wifi not connected
     }
