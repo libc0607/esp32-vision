@@ -30,7 +30,7 @@
     [vision]
     video=/loop.mjpeg
     lcd_rotation=0
-    target_fps=15
+    loop_mode=false
 
    This is just an EARLY DEMO to verify all parts of the
    hardware can work properly.
@@ -47,13 +47,13 @@ const char* wifi_host = "vision";
 #define CONF_TARGET_FPS_DEFAULT 15
 //#define CONF_GRAVITY_DEFAULT  true
 #define CONF_LCD_ROTATION_DEFAULT  0
-#define CONF_LOOP_MODE_DEFAULT false
+#define CONF_LOOP_MODE_DEFAULT true
 #define DEEP_SLEEP_LONG_S  30
 #define DEEP_SLEEP_SHORT_S  2
 #define DEEP_SLEEP_SHORT_CNT  6
 #define TEMP_PROTECT_HIGH_THRESH_12B  1840 // ~60°C @10k,B3380
 #define LCD_BACKLIGHT_MIN_8B  16
-#define LCD_PWM_FIR_LEN 16
+#define LCD_PWM_FIR_LEN 32
 
 
 #define FILE_SYSTEM  SD
@@ -121,9 +121,9 @@ DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 
 #include "MjpegClass.h"
 static MjpegClass mjpeg;
+uint8_t *mjpeg_buf;
 
-int next_frame = 0;
-unsigned long start_ms, curr_ms, next_frame_ms, lightsleep_ms;
+unsigned long lightsleep_ms;
 uint8_t lcd_pwm_filter[LCD_PWM_FIR_LEN] = {LCD_BACKLIGHT_MIN_8B};
 uint8_t p_lcd_pwm_filter;
 
@@ -136,6 +136,14 @@ int led_status;
 RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR int lastTappedCount = 0;
 RTC_DATA_ATTR uint8_t lcd_brightness_by_key = LCD_BACKLIGHT_MIN_8B;
+
+// pixel drawing callback
+static int drawMCU(JPEGDRAW *pDraw)
+{
+  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
+  return 1;
+} /* drawMCU() */
 
 void set_io_before_deep_sleep() {
 
@@ -588,7 +596,7 @@ uint8_t get_lcd_brightness_by_adc (int adc_pin) {
 }
 
 uint8_t lcd_pwm_fir_filter (uint8_t pwm_val) {
-  uint32_t lcd_pwm_filter_sum;
+  uint32_t lcd_pwm_filter_sum = 0;
   
   lcd_pwm_filter[p_lcd_pwm_filter] = pwm_val;
   p_lcd_pwm_filter++;
@@ -606,13 +614,12 @@ void setup()
 {
   int i;
   String conf_gifname = CONF_GIFNAME_DEFAULT;
-  int conf_target_fps = CONF_TARGET_FPS_DEFAULT;
+  //int conf_target_fps = CONF_TARGET_FPS_DEFAULT;
 //  bool conf_gravity = CONF_GRAVITY_DEFAULT;
   int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
   bool conf_loop_mode = CONF_LOOP_MODE_DEFAULT;
   int last_key_state = HIGH;
   int key_state = HIGH;
-  uint8_t *mjpeg_buf;
   File vFile;
 
   WiFi.mode(WIFI_OFF);
@@ -760,9 +767,9 @@ void setup()
       conf_file.println("[vision]");
       conf_file.print("video="); conf_file.println(CONF_GIFNAME_DEFAULT);
 //      conf_file.print("gravity="); conf_file.println(CONF_GRAVITY_DEFAULT? "true": "false"); 
-      conf_file.print("target_fps="); conf_file.println(CONF_TARGET_FPS_DEFAULT);
+//      conf_file.print("target_fps="); conf_file.println(CONF_TARGET_FPS_DEFAULT);
       conf_file.print("lcd_rotation="); conf_file.println(CONF_LCD_ROTATION_DEFAULT);
-//      conf_file.print("loop_mode="); conf_file.println(CONF_LOOP_MODE_DEFAULT? "true": "false");
+      conf_file.print("loop_mode="); conf_file.println(CONF_LOOP_MODE_DEFAULT? "true": "false");
       conf_file.close();
     }
   }
@@ -794,7 +801,7 @@ void setup()
     printErrorMessage(ini.getError());
     Serial.print("<vision.gravity> not found; use vision.gravity.default=");
     Serial.println(conf_gravity ? "true" : "false");
-  }
+  }*/
   if (ini.getValue("vision", "loop_mode", conf_buf, buf_len, conf_loop_mode)) {
     Serial.print("vision.loop_mode=");
     Serial.println(conf_loop_mode ? "true" : "false");
@@ -802,7 +809,7 @@ void setup()
     printErrorMessage(ini.getError());
     Serial.print("<vision.loop_mode> not found; use vision.loop_mode.default=");
     Serial.println(conf_loop_mode ? "true" : "false");
-  }*/
+  }
   if (ini.getValue("vision", "lcd_rotation", conf_buf, buf_len)) {
     conf_lcd_rotation = String(conf_buf).toInt();
     Serial.print("vision.lcd_rotation=");
@@ -811,15 +818,6 @@ void setup()
     printErrorMessage(ini.getError());
     Serial.print("<vision.lcd_rotation> not found; use vision.target_fps.default=");
     Serial.println(conf_lcd_rotation);
-  }
-  if (ini.getValue("vision", "target_fps", conf_buf, buf_len)) {
-    conf_target_fps = String(conf_buf).toInt();
-    Serial.print("vision.target_fps=");
-    Serial.println(conf_target_fps);
-  } else {
-    printErrorMessage(ini.getError());
-    Serial.print("<vision.target_fps> not found; use vision.target_fps.default=");
-    Serial.println(conf_target_fps);
   }
 
   digitalWrite(PIN_LED, HIGH); // startup blink 
@@ -849,64 +847,46 @@ void setup()
       Serial.println(F("ERROR: Failed to open GIF file for reading"));
     } else {
       do {
-/*      if (!vFile.seek(0)) {
+        if (!vFile.seek(0)) {
           Serial.println(F("seek failed"));
           delay(500);
           continue;
-        }*/
+        }
         Serial.println(F("MJPEG video start"));
-        start_ms = millis();
-        curr_ms = millis();
-        next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps / 2);
-        mjpeg.setup(vFile, mjpeg_buf, (Arduino_TFT *)gfx, false);
-        while (mjpeg.readMjpegBuf()) {
-          curr_ms = millis();
-          if (millis() < next_frame_ms) {
-            // Play video
-            mjpeg.drawJpg();
-            int remain_ms = next_frame_ms - millis();
-            if (remain_ms > 0) {
-              delay(remain_ms);
-            }
-          } else {
-            //Serial.println(F("Skip frame")); 
-          }
-  
-          curr_ms = millis();
-          next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps);
-  
+        mjpeg.setup(&vFile, mjpeg_buf, drawMCU, false, true);
+        while (vFile.available()) {
+          mjpeg.readMjpegBuf();
+          mjpeg.drawJpg();
           // check key
-          digitalWrite(PIN_LED, digitalRead(PIN_KEY)); // sync LED to key
+          //digitalWrite(PIN_LED, digitalRead(PIN_KEY)); // sync LED to key
           last_key_state = key_state;
           key_state = digitalRead(PIN_KEY);
           if (last_key_state == LOW && key_state == LOW) {  
             lastTappedCount = bootCount;
-            //if (conf_loop_mode) {
-              lightsleep_ms = millis();
+            if (conf_loop_mode) {
               while(digitalRead(PIN_KEY) == LOW);
               Serial.println("Light sleep start");
               ledcWrite(1, 0);
               digitalWrite(PIN_LED, LOW); delay(50);
               digitalWrite(PIN_LED, HIGH); 
               gfx->displayOff();
+              lightsleep_ms = millis();
               gpio_wakeup_enable((gpio_num_t)PIN_KEY, GPIO_INTR_LOW_LEVEL);
               esp_sleep_enable_gpio_wakeup();
               esp_light_sleep_start();
+              lightsleep_ms = millis() - lightsleep_ms;
               Serial.print("Wakeup from light sleep, ");
               Serial.print(lightsleep_ms); Serial.println("ms");
               gfx->begin();
               while(digitalRead(PIN_KEY) == LOW); // wait for key release
-              lightsleep_ms = millis() - lightsleep_ms;
-              start_ms += lightsleep_ms;
-              curr_ms += lightsleep_ms;
-            //}
+            }
           } 
-  
           SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
           // sync lcd brightness
           ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
         }
-        //Serial.println(F("Rewind"));
+        Serial.println(F("Rewind"));
+        //delay(500);
       } while (conf_loop_mode);
       Serial.println(F("MJPEG video end"));
       vFile.close();
