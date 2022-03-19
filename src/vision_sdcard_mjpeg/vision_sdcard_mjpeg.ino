@@ -137,6 +137,11 @@ RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR int lastTappedCount = 0;
 RTC_DATA_ATTR uint8_t lcd_brightness_by_key = LCD_BACKLIGHT_MIN_8B;
 
+RTC_DATA_ATTR int loop_mode_coldboot = 0;
+#define COLDBOOT_Y_NOT 0
+#define COLDBOOT_Y_UP 1
+#define COLDBOOT_Y_DOWN 2
+
 // pixel drawing callback
 static int drawMCU(JPEGDRAW *pDraw)
 {
@@ -805,6 +810,10 @@ void setup()
   if (ini.getValue("vision", "loop_mode", conf_buf, buf_len, conf_loop_mode)) {
     Serial.print("vision.loop_mode=");
     Serial.println(conf_loop_mode ? "true" : "false");
+  } else if (loop_mode_coldboot != COLDBOOT_Y_NOT) {
+    Serial.print("vision.loop_mode set by cold boot: ");
+    conf_loop_mode = (loop_mode_coldboot == COLDBOOT_Y_UP)? true: false;
+    Serial.println(conf_loop_mode ? "true" : "false");
   } else {
     printErrorMessage(ini.getError());
     Serial.print("<vision.loop_mode> not found; use vision.loop_mode.default=");
@@ -978,31 +987,13 @@ void loop()
     
     ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
     
-    // 退出webserver进入深睡条件：
-    // (双击 & 盖住光传感器（或无光）& 屏幕水平放置) || (按下按键)
-    // 不满足的话都不会退出
+    // 退出webserver进入深睡条件：按下按键
     if (digitalRead(PIN_KEY) == LOW) {
       delay(20);
       if (digitalRead(PIN_KEY) == LOW) {
         exit_loop = true;
       }
     }
-    if (digitalRead(PIN_ACC_INT1) == HIGH) {
-      DFRobot_LIS2DW12:: eTap_t tapEvent = acce.tapDetect();
-      if (tapEvent == DFRobot_LIS2DW12::eDTap) {
-        Serial.println("Double Tap Detected");
-        int light_level = int(pow((analogRead(PIN_SENSOR_ADC) / 4096.0), 2.0) * 255.0);
-        if (SENSOR_DISWIFI_THRESH_8B > light_level) {
-          delay(100);
-          light_level = int(pow((analogRead(PIN_SENSOR_ADC) / 4096.0), 2.0) * 255.0);
-          if (SENSOR_DISWIFI_THRESH_8B > light_level) {
-            if (abs(acce.readAccZ()) > ACCE_DISWIFI_Z_THRESH ) {
-              exit_loop = true;
-            }
-          }
-        }
-      }
-    } // 大 箭 头
   } else {
     // 如果没有连接就进到loop，说明 a.前面尝试连接wifi炒屎了 或 b.wifi断开了
     // 就直接睡眠了准备正常工作
@@ -1013,7 +1004,21 @@ void loop()
     Serial.println(F("init done, deep sleep now"));
     gfx->begin();
     ledcWrite(1, LCD_BACKLIGHT_MIN_8B);
-    gfx->fillScreen(GREEN); // 绿一下 提醒一下
+    DFRobot_LIS2DW12::eOrient_t orientation = acce.getOrientation();
+    if (orientation == DFRobot_LIS2DW12::eYDown){
+     Serial.println("Y down");
+     loop_mode_coldboot = COLDBOOT_Y_DOWN;
+     gfx->fillScreen(PURPLE); 
+    } else if (orientation == DFRobot_LIS2DW12::eYUp){
+     Serial.println("Y up");
+     loop_mode_coldboot = COLDBOOT_Y_UP;
+     gfx->fillScreen(PINK); 
+    } else {
+      Serial.println("not Y");
+      loop_mode_coldboot = COLDBOOT_Y_NOT;
+      gfx->fillScreen(GREEN); 
+    }
+    
     delay(500);
     gfx->fillScreen(BLACK);
     ledcWrite(1, 0);
