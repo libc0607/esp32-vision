@@ -76,12 +76,12 @@
 #define CONFIG_FILENAME "/config.txt"       // SD Nand 根目录中的配置文件的名称。该文件如果不存在会自动生成。 
 #define CONF_GIFNAME_DEFAULT "/loop.mjpeg"  // 配置文件中的默认循环播放的文件名。另外，如果工作时检测到配置文件无效，作为默认，会尝试播放这个文件名。
 #define CONF_LCD_ROTATION_DEFAULT  0        // LCD 的默认旋转方向，可以在配置文件中修改
-#define CONF_TARGET_FPS_DEFAULT 15          // 默认的目标 FPS。如果解码能力高于这个值则会按照这个值显示，反之会跳帧。可以在配置文件中修改
 #define DEEP_SLEEP_SHORT_S  6               // 在最近一次敲击唤醒之后的 DEEP_SLEEP_SHORT_CNT 次睡眠前，会设置定时器使用 DEEP_SLEEP_SHORT_S 作为唤醒延时；否则使用 DEEP_SLEEP_LONG_S
 #define DEEP_SLEEP_SHORT_CNT  6             // 每次检测到敲击唤醒后重置计数器
 #define DEEP_SLEEP_LONG_S   30              // DEEP_SLEEP_LONG_S 和 DEEP_SLEEP_SHORT_S 是定时器唤醒的时间，单位是秒
 #define BAT_ADC_THRESH_LOW  1700            // 低电压保护。当每一轮工作开始时，如果 ADC 读取到的电压读数低于这个值，就不会播放 GIF，直接进入下一轮睡眠
-                                            // 由于 ESP32 的 ADC 质量不咋样，所以没有换算成电压。你可以根据自己板子的情况尝试调节这个值。  
+                                            // 由于 ESP32 的 ADC 质量不咋样，并且电池的截止电压也各自不同，所以没有换算成电压。
+                                            // 你可以根据自己板子的情况尝试调节这个值。  
 
 // 屏幕配置
 //Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true);
