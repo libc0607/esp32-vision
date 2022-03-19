@@ -47,12 +47,13 @@ const char* wifi_host = "vision";
 #define CONF_TARGET_FPS_DEFAULT 15
 //#define CONF_GRAVITY_DEFAULT  true
 #define CONF_LCD_ROTATION_DEFAULT  0
+#define CONF_LOOP_MODE_DEFAULT false
 #define DEEP_SLEEP_LONG_S  30
-#define DEEP_SLEEP_SHORT_S  6
+#define DEEP_SLEEP_SHORT_S  2
 #define DEEP_SLEEP_SHORT_CNT  6
 #define TEMP_PROTECT_HIGH_THRESH_12B  1840 // ~60°C @10k,B3380
 #define LCD_BACKLIGHT_MIN_8B  16
-#define LCD_PWM_FIR_LEN 8
+#define LCD_PWM_FIR_LEN 16
 
 
 #define FILE_SYSTEM  SD
@@ -122,11 +123,7 @@ DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 static MjpegClass mjpeg;
 
 int next_frame = 0;
-int skipped_frames = 0;
-unsigned long total_sd_mjpeg = 0;
-unsigned long total_decode_video = 0;
-unsigned long total_remain = 0;
-unsigned long start_ms, curr_ms, next_frame_ms;
+unsigned long start_ms, curr_ms, next_frame_ms, lightsleep_ms;
 uint8_t lcd_pwm_filter[LCD_PWM_FIR_LEN] = {LCD_BACKLIGHT_MIN_8B};
 uint8_t p_lcd_pwm_filter;
 
@@ -138,7 +135,6 @@ int led_status;
 
 RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR int lastTappedCount = 0;
-RTC_DATA_ATTR int lastKeyDownCount = 0;
 RTC_DATA_ATTR uint8_t lcd_brightness_by_key = LCD_BACKLIGHT_MIN_8B;
 
 void set_io_before_deep_sleep() {
@@ -468,11 +464,11 @@ void handleOTAresult() {
 }
   
 void handleOTA() {
-  Serial.println("Start OTA Update");
   HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
     gfx->begin();
     gfx->fillScreen(RED);
+    //Serial.println("Start OTA Update");
     Serial.setDebugOutput(true);
     Serial.printf("Update: %s\n", upload.filename.c_str());
     if (!Update.begin()) { //start with max available size
@@ -481,6 +477,7 @@ void handleOTA() {
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     led_status = (led_status == HIGH)? LOW: HIGH;
     digitalWrite(PIN_LED, led_status);
+    Serial.print(".");
     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
       Update.printError(Serial);
     }
@@ -612,16 +609,17 @@ void setup()
   int conf_target_fps = CONF_TARGET_FPS_DEFAULT;
 //  bool conf_gravity = CONF_GRAVITY_DEFAULT;
   int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
+  bool conf_loop_mode = CONF_LOOP_MODE_DEFAULT;
   int last_key_state = HIGH;
   int key_state = HIGH;
-
+  uint8_t *mjpeg_buf;
+  File vFile;
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
   Serial.begin(115200);
   Serial.print("Vision v3.3, SD MJPEG WebServer OTA demo; bootcounter: "); Serial.print(bootCount);
-  Serial.print(", lastTapped: "); Serial.print(lastTappedCount);
-  Serial.print(", lastKeyDown: "); Serial.println(lastKeyDownCount);
+  Serial.print(", lastTapped: "); Serial.println(lastTappedCount);
 
   // disable all PAD HOLD
   gpio_deep_sleep_hold_dis();
@@ -764,6 +762,7 @@ void setup()
 //      conf_file.print("gravity="); conf_file.println(CONF_GRAVITY_DEFAULT? "true": "false"); 
       conf_file.print("target_fps="); conf_file.println(CONF_TARGET_FPS_DEFAULT);
       conf_file.print("lcd_rotation="); conf_file.println(CONF_LCD_ROTATION_DEFAULT);
+//      conf_file.print("loop_mode="); conf_file.println(CONF_LOOP_MODE_DEFAULT? "true": "false");
       conf_file.close();
     }
   }
@@ -796,7 +795,14 @@ void setup()
     Serial.print("<vision.gravity> not found; use vision.gravity.default=");
     Serial.println(conf_gravity ? "true" : "false");
   }
-*/
+  if (ini.getValue("vision", "loop_mode", conf_buf, buf_len, conf_loop_mode)) {
+    Serial.print("vision.loop_mode=");
+    Serial.println(conf_loop_mode ? "true" : "false");
+  } else {
+    printErrorMessage(ini.getError());
+    Serial.print("<vision.loop_mode> not found; use vision.loop_mode.default=");
+    Serial.println(conf_loop_mode ? "true" : "false");
+  }*/
   if (ini.getValue("vision", "lcd_rotation", conf_buf, buf_len)) {
     conf_lcd_rotation = String(conf_buf).toInt();
     Serial.print("vision.lcd_rotation=");
@@ -824,18 +830,8 @@ void setup()
     
     // wakeup by accel. or timer
     // play GIF
+    ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
 
-    bool lcd_use_mem = (bootCount >= DEEP_SLEEP_SHORT_CNT) && (bootCount - lastKeyDownCount < DEEP_SLEEP_SHORT_CNT);
-    if (lcd_use_mem) {
-      ledcWrite(1, lcd_brightness_by_key); 
-      Serial.print("lcd_brightness: by key, ");
-      Serial.println(lcd_brightness_by_key);
-    } else {  // use adc
-      ledcWrite(1, lcd_brightness); 
-      Serial.print("lcd_brightness: by adc, ");
-      Serial.println(lcd_brightness);
-    }
-  
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
       Serial.println("wakeup by ext0");
       lastTappedCount = bootCount;
@@ -844,63 +840,78 @@ void setup()
     } else {
       Serial.println("wakeup by yjsnpi");
     }
-
-    File vFile = FILE_SYSTEM.open(conf_gifname);
+    mjpeg_buf = (uint8_t *)malloc(MJPEG_BUFFER_SIZE);
+    if (!mjpeg_buf) {
+      Serial.println(F("mjpeg_buf malloc failed!"));
+    }
+    vFile = FILE_SYSTEM.open(conf_gifname);
     if (!vFile || vFile.isDirectory()) {
       Serial.println(F("ERROR: Failed to open GIF file for reading"));
-    } else  {
-      uint8_t *mjpeg_buf = (uint8_t *)malloc(MJPEG_BUFFER_SIZE);
-      if (!mjpeg_buf) {
-        Serial.println(F("mjpeg_buf malloc failed!"));
-      } else {
+    } else {
+      do {
+/*      if (!vFile.seek(0)) {
+          Serial.println(F("seek failed"));
+          delay(500);
+          continue;
+        }*/
         Serial.println(F("MJPEG video start"));
         start_ms = millis();
         curr_ms = millis();
         next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps / 2);
         mjpeg.setup(vFile, mjpeg_buf, (Arduino_TFT *)gfx, false);
-        unsigned long start = millis();
-
         while (mjpeg.readMjpegBuf()) {
-          total_sd_mjpeg += millis() - curr_ms;
           curr_ms = millis();
           if (millis() < next_frame_ms) {
             // Play video
             mjpeg.drawJpg();
-            total_decode_video += millis() - curr_ms;
             int remain_ms = next_frame_ms - millis();
             if (remain_ms > 0) {
-              total_remain += remain_ms;
               delay(remain_ms);
             }
           } else {
-            ++skipped_frames;
             //Serial.println(F("Skip frame")); 
           }
-
+  
           curr_ms = millis();
           next_frame_ms = start_ms + (++next_frame * 1000 / conf_target_fps);
-          
-          SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
-          
+  
           // check key
           digitalWrite(PIN_LED, digitalRead(PIN_KEY)); // sync LED to key
           last_key_state = key_state;
           key_state = digitalRead(PIN_KEY);
           if (last_key_state == LOW && key_state == LOW) {  
             lastTappedCount = bootCount;
-            lcd_brightness_by_key = get_lcd_brightness_by_adc(PIN_SENSOR_ADC);
-            lastKeyDownCount = bootCount;
-          }
-
+            //if (conf_loop_mode) {
+              lightsleep_ms = millis();
+              while(digitalRead(PIN_KEY) == LOW);
+              Serial.println("Light sleep start");
+              ledcWrite(1, 0);
+              digitalWrite(PIN_LED, LOW); delay(50);
+              digitalWrite(PIN_LED, HIGH); 
+              gfx->displayOff();
+              gpio_wakeup_enable((gpio_num_t)PIN_KEY, GPIO_INTR_LOW_LEVEL);
+              esp_sleep_enable_gpio_wakeup();
+              esp_light_sleep_start();
+              Serial.print("Wakeup from light sleep, ");
+              Serial.print(lightsleep_ms); Serial.println("ms");
+              gfx->begin();
+              while(digitalRead(PIN_KEY) == LOW); // wait for key release
+              lightsleep_ms = millis() - lightsleep_ms;
+              start_ms += lightsleep_ms;
+              curr_ms += lightsleep_ms;
+            //}
+          } 
+  
+          SD.begin(PIN_SD_CS);  // FUCK! THAT! MAGIC!!!就这一行调了一晚上
           // sync lcd brightness
-          if (!lcd_use_mem) {
-            ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
-          }
+          ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
         }
-        Serial.println(F("MJPEG video end"));
-        vFile.close();
-      }
+        //Serial.println(F("Rewind"));
+      } while (conf_loop_mode);
+      Serial.println(F("MJPEG video end"));
+      vFile.close();
     }
+    
     digitalWrite(PIN_LED, HIGH);
     Serial.println(F("deep sleep"));
     ledcWrite(1, 0);
@@ -1025,14 +1036,11 @@ void loop()
     gfx->fillScreen(GREEN); // 绿一下 提醒一下
     delay(500);
     gfx->fillScreen(BLACK);
-    for (int i = lcd_brightness; i >= 0; i--) {
-      ledcWrite(1, i);
-      delay(1);
-    }
+    ledcWrite(1, 0);
     ledcDetachPin(PIN_TFT_BL);
-    delay(20);
+    delay(5);
     gfx->displayOff();
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SHORT_S * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(uS_TO_S_FACTOR);
     set_io_before_deep_sleep();
     esp_deep_sleep_start();        
   }
