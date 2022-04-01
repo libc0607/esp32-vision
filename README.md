@@ -31,10 +31,11 @@ V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_gc9a01_rel](https://oshwhub.com/libc0
 
 ![image](https://user-images.githubusercontent.com/8705034/158412090-078fbdf3-1522-4b3c-a5c7-30ed71a7bd47.png)  
 
-PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_liyuev3_st7789_rel)   
+PCB 方版：  
+V3.2: [OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_liyuev3_st7789_rel)   
+V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-3_st7789_rel)  
 
-![image](https://user-images.githubusercontent.com/8705034/155985375-e8274fe1-dd50-4bb7-a1be-882611fffcee.png)  
-
+![image](https://user-images.githubusercontent.com/8705034/161293365-5aa8db52-e6ec-49e8-a091-8577e36fbef4.png)
 
 ## 软件
 目前做了两版测试代码，可以实现基本功能，但都不算正式 Release。有待填坑   
@@ -53,6 +54,8 @@ PCB 方版：[OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://os
 
 [璃月版外壳在这](https://github.com/libc0607/esp32-vision/tree/main/stl/liyue)    
 
+[稻妻的在做了，咕咕咕.webp](https://github.com/libc0607/esp32-vision/tree/main/stl/inazuma)  
+
 ![image](https://user-images.githubusercontent.com/8705034/155986652-94c0bdcc-bc52-475f-8d96-ee1dc8aed9e1.png)   
 
 ![image](https://user-images.githubusercontent.com/8705034/155986832-7f6c0eb7-d1e6-46ee-b782-bc37fff176d0.png)   
@@ -70,7 +73,7 @@ https://oshwhub.com/Myzhazha/esp32_pico-d4-video
  - 电路部分各做各的，不过也有相互参考   
  - 程序部分各做各的  
  - 他的 GC9A01 版蒙德外壳基于我的修改  
- - 他后续会卖电路套件（不含外壳），我不对外卖，所以想买的去找他  
+ - 他后续会卖电路套件（不含外壳），我不对外卖，所以想买的去找他；他的 Q群 636426429  
 
 
 ## 参考 & 引用
