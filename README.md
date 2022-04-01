@@ -60,8 +60,7 @@ V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_st7789_rel](https://oshwhub.com/libc0
 
 ![image](https://user-images.githubusercontent.com/8705034/155986832-7f6c0eb7-d1e6-46ee-b782-bc37fff176d0.png)   
 
-
-
+![image](https://user-images.githubusercontent.com/8705034/161298378-ef804b8e-395f-4212-8504-cf7b54752a0f.png)  
 
 ## 你也可以看看 
 本设计的整体思路是不用一直点亮屏幕，大部分的时候通过深度睡眠省电。但受体积限制和屏幕拖累，续航还是尿崩  
