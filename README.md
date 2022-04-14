@@ -22,23 +22,24 @@
  - 低功耗 DC-DC 降压 ETA3425，低电量时 100% 导通，即断电电压由锂电池保护板决定  
  - 用了一个 SY6280AAC 让屏和 SD Nand 支持断电 
  - 支持且仅支持无线充电，需要外接无线充电模块并将线圈贴在外壳上；配套使用 华为 GT2 Pro 的无线充电座即可充电，淘宝大概卖 29  
- - V3.3 版本增加一个按键，长按开关机，短按可被 ESP32 识别，但代码还没写
+ - V3.3 版本增加一个按键，长按开关机，短按可被 ESP32 识别
 
 ## PCB 设计  
-PCB 圆版：  
-V3.2: [OSHWHub: libc0607/esp32_vision_v3-2_gc9a01_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_gc9a01_rel)    
+PCB 圆版：   
 V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_gc9a01_rel](https://oshwhub.com/libc0607/esp32_vision_v3-3_gc9a01_rel)  
 
 ![image](https://user-images.githubusercontent.com/8705034/158412090-078fbdf3-1522-4b3c-a5c7-30ed71a7bd47.png)  
 
 PCB 方版：  
-V3.2: [OSHWHub: libc0607/esp32_vision_v3-2_liyuev3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-2_liyuev3_st7789_rel)   
 V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_st7789_rel](https://oshwhub.com/libc0607/esp32_vision_v3-3_st7789_rel)  
+注：1.54 寸 ST7789 屏幕有很多厂家生产外形和引脚定义兼容的型号，但有一部分型号屏幕的侧面及背面漏光。  
+由于把漆喷到一点都不漏光这件事不是很有操作性，所以推荐选择不漏光的版本；你可能需要问问卖家  
 
 ![image](https://user-images.githubusercontent.com/8705034/161293365-5aa8db52-e6ec-49e8-a091-8577e36fbef4.png)
 
 ## 软件
 目前做了两版测试代码，可以实现基本功能，但都不算正式 Release。有待填坑   
+后续主要更新会集中在 vision_sdcard_mjpeg 上  
 
 [vision_SPIFFS_GIF_video](https://github.com/libc0607/esp32-vision/tree/main/src/vision_SPIFFS_GIF_video)： 不贴 SD Nand，仅使用 ESP32 内部的 SPIFFS 作为存储的版本  
 [vision_sdcard_mjpeg](https://github.com/libc0607/esp32-vision/tree/main/src/vision_sdcard_mjpeg)： 使用 SD Nand 作为存储，支持 Wi-Fi 上传，支持 OTA 的版本  
@@ -54,7 +55,7 @@ V3.3: [OSHWHub: libc0607/esp32_vision_v3-3_st7789_rel](https://oshwhub.com/libc0
 
 [璃月版外壳在这](https://github.com/libc0607/esp32-vision/tree/main/stl/liyue)    
 
-[稻妻的在做了，咕咕咕.webp](https://github.com/libc0607/esp32-vision/tree/main/stl/inazuma)  
+[稻妻的](https://github.com/libc0607/esp32-vision/tree/main/stl/inazuma)  
 
 ![image](https://user-images.githubusercontent.com/8705034/155986652-94c0bdcc-bc52-475f-8d96-ee1dc8aed9e1.png)   
 
