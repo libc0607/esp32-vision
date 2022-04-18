@@ -1,12 +1,11 @@
 # vision_sdcard_mjpeg
 这里是 ESP32 Vision 的测试代码之一。  
 由于 SPIFFS 的容量只能够存十秒上下的 GIF，很多花活可能整不出来；这个 Demo 使用了板上容量可高达 8GB 的 SD Nand 来支持整活。   
+注：目前的蓝牙部分还有各种各样的 Bug，emmmm……  
 
 ## 测试效果 
-![image](https://user-images.githubusercontent.com/8705034/155977538-5bb3ef90-7baa-4e10-b06e-492b431bec85.png)  
-
-见 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试 - bcccc23333](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
-（和那个表面看上去没什么区别所以就复制了）
+[Bilibili BV13S4y1e7Yu](https://www.bilibili.com/video/BV13S4y1e7Yu)  
+这里用于演示的视频片段见 [hydro_unaligned](https://github.com/libc0607/esp32-vision/tree/main/src/vision_sdcard_mjpeg/hydro_unaligned) 目录下  
 
 ## 硬件
 目前版本的代码可配合 硬件版本 V3.3 使用。  
@@ -31,7 +30,7 @@
  - 支持在网页中 OTA 升级固件
  - 播放掉帧，性能堪忧（
  - 任何时候长按超过三秒都会被断电或是上电
- - 蓝牙功能在写了
+ - 蓝牙启用后，可以使用蓝牙连接 iTag 来控制在两段视频间平滑切换（但 bug 还没修完，每次开机后如果断连的话要重启才能再连上（
 
 ## 编译 & 上传 & 初始化设置 
 
@@ -42,9 +41,9 @@
 5. 安装 [DFRobot/DFRobot_LIS](https://github.com/DFRobot/DFRobot_LIS)  
 6. 安装 [stevemarple/IniFile](https://github.com/stevemarple/IniFile)  
 7. 下载这坨源码，打开
-8. 选择：ESP32 Dev Module, 240MHz CPU, 80MHz Flash, DIO, 4MB(32Mb), Default (1.2M/1.5M), PSRAM Disable  
+8. 选择：ESP32 Dev Module, 240MHz CPU, 80MHz Flash, DIO, 4MB(32Mb), (1.9M/190k), PSRAM Disable  
 9. 上传
-10. 建立名为 Celestia， 密码为 mimitomo 的 2.4GHz Wi-Fi，该网络中需要提供 DHCP 服务；（就是用电脑或者手机开热点的意思  
+10. 建立名为 Celestia， 密码为 mimitomo 的 2.4GHz Wi-Fi，该网络中需要提供 DHCP 服务；（就是用电脑或者手机开热点的意思；并且由于需要加载 js，这个热点需要能访问互联网）  
 11. 给板子上电  
 12. 当看到板子连入该 Wi-Fi 后，在 DHCP 地址池中找到该设备，记录下其 IP 地址
 13. 使用浏览器 http 打开其 IP 地址，下文以 192.168.1.200 为例；如果你的网络中支持 MDNS 服务也可以打开 http://vision.local    
@@ -58,26 +57,51 @@
 
 ## 自定义配置 
 
-配置文件 /sdcard/config.txt 中的可自定义内容：   
+配置文件 /config.txt 中的可自定义内容：   
 
 ```
  [vision]
- video=/loop.mjpeg       # 要播放的文件名。需要以 / 开头，并且文件名不要太长不然会出bug
+ video=/loop.mjpeg       # 要播放的文件名。需要以 / 开头，并且文件名不要超过 8 个字符（短文件名），不然会出bug
  lcd_rotation=0          # LCD 的方向。取值范围 0~3，对应 0°, 90°, 180°, 270°，根据实际情况修改
  loop_mode=false         # true：循环播放视频模式，不会自动息屏；但依然可以用按键进入浅睡息屏模式，该模式下快速唤醒；浅睡不算很省电
                          # false：单次播放模式，播放一次后进入深睡，深睡模式下支持双击唤醒；从唤醒到播放需要几秒，但深睡省电
                          # 循环模式优先级：配置文件>冷启按键时方向>默认值
+ ble_en=false            # BLE 开关
+ ble_mac=00:12:34:56:78:9a   # 你的 iTag 的 MAC 地址。可以通过例如 nRF Connect 这样的应用查看。
+ 
 ```
+目前的设定中，有 3 种工作模式：  
+(a). 循环播放两段视频，通过 iTag 控制两段视频的切换  
+ 该模式下需要剪出 4 段视频，两个循环片段 a_loop 及 b_loop，以及两个过渡片段 a_setup 和 b_setup；   
+ - loop_mode = true
+ - ble_en = true
+ - ble_mac = \<iTag MAC address\>
+ - 上传 /a_setup.mjpeg, /a_loop.mjpeg, /b_setup.mjpeg, /b_loop.mjpeg  
+ 
+ 需要先开启 iTag，然后给神之眼开机；  
+ 目前的 bug 是这次连接如果不慎断开则第二次无法连接，需要自行重启一下  
+ LED 会指示当前正在播放的是 A 视频还是 B 视频；  
+ 
+(b). 循环单个视频
+  该模式需要一段视频
+ - 上传视频 (例如 hydro.mjpeg)
+ - loop_mode = true
+ - ble_en = false
+ - video = hydro.mjpeg
+ 
+ (c). 单次播放后进入睡眠，通过双击唤醒
+  该模式需要一段视频
+ - 上传视频 (例如 hydro.mjpeg)
+ - loop_mode = false
+ - video = hydro.mjpeg
 
-如果你想恢复默认值，只需要删除 /sdcard/config.txt 并重启即可，会生成一个新的默认配置的文件。  
+如果你想恢复默认值，只需要删除 /config.txt 并重启即可，会生成一个新的默认配置的文件。  
 
 代码中有几个可以配置的地方（其中一部分可能在日后（如果有，咕）的版本中移入配置文件）：  
 ```
 
 // 系统配置
 #define CONFIG_FILENAME "/config.txt"       // SD Nand 根目录中的配置文件的名称。该文件如果不存在会自动生成。 
-#define CONF_GIFNAME_DEFAULT "/loop.mjpeg"  // 配置文件中的默认循环播放的文件名。另外，如果工作时检测到配置文件无效，作为默认，会尝试播放这个文件名。
-#define CONF_LCD_ROTATION_DEFAULT  0        // LCD 的默认旋转方向，可以在配置文件中修改
 #define DEEP_SLEEP_SHORT_S  6               // 在最近一次敲击唤醒之后的 DEEP_SLEEP_SHORT_CNT 次睡眠前，会设置定时器使用 DEEP_SLEEP_SHORT_S 作为唤醒延时；否则使用 DEEP_SLEEP_LONG_S
 #define DEEP_SLEEP_SHORT_CNT  6             // 每次检测到敲击唤醒后重置计数器
 #define DEEP_SLEEP_LONG_S   30              // DEEP_SLEEP_LONG_S 和 DEEP_SLEEP_SHORT_S 是定时器唤醒的时间，单位是秒
@@ -101,10 +125,19 @@ const char* wifi_pwd = "mimitomo";
 const char* wifi_host = "vision";           // MDNS 主机名。这样设置得到的结果形如 vision.local                             
 
 ```
+## 早期版本
+由于早期使用的分区是默认的 1.2M/1.2M/1.5M，加入 BLE 后空间不够了。。所以 BLE 版本改了分区  
+加入 BLE 前的最后一个版本为 [78b3749](https://github.com/libc0607/esp32-vision/commit/78b3749)  
+
+## TO-DOs
+本来想用 ESP-NOW（例如 [Picoclick](https://github.com/makermoekoe/Picoclick-C3)），但国内好像没有那种买来就能用的  
+iTag 虽然使人逻辑混乱，但有商品卖，且足够便宜，先凑合用着  
+
 ## 参考 
 [moononournation/RGB565_video](https://github.com/moononournation/RGB565_video)   
 ESP32 Arduino 中的 SDWebServer 和 OTAWebUpdater 示例  
 雷元素图标来自 [Bilibili: 鱼翅翅Kira](https://space.bilibili.com/2292091)  
+BLE iTag 相关代码抄自 [100-x-arduino.blogspot.com](http://100-x-arduino.blogspot.com/2018/05/itag-i-arduino-ide-czy-esp32-otworzy.html)  
 
 ## 免责声明  
 这段代码仅用作测试，由于滥用造成的一切不好的后果和作者无关。  
