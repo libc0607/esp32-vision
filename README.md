@@ -6,6 +6,7 @@
 [Bilibili BV1ir4y1r7ZS: 给刻师傅做个神之眼](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
 [Bilibili BV1hS4y1D7fo：蒙德外壳+圆版 测试](https://www.bilibili.com/video/BV1hS4y1D7fo)  
 [Bilibili BV1a34y1s7b5：稻妻外壳+圆版 测试](https://www.bilibili.com/video/BV1a34y1s7b5)  
+[Bilibili BV13S4y1e7Yu：蓝牙切换视频测试](https://www.bilibili.com/video/BV13S4y1e7Yu)  
 
 ![image](https://github.com/libc0607/esp32-vision/raw/main/img/demo-mondstadt-yjsnpi.gif)   
 
