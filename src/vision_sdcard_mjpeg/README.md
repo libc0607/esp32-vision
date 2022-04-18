@@ -1,7 +1,7 @@
 # vision_sdcard_mjpeg
 这里是 ESP32 Vision 的测试代码之一。  
 由于 SPIFFS 的容量只能够存十秒上下的 GIF，很多花活可能整不出来；这个 Demo 使用了板上容量可高达 8GB 的 SD Nand 来支持整活。   
-注：目前的蓝牙部分还有各种各样的 Bug，emmmm……  
+注：由于加入蓝牙时这堆代码已经变成屎山了，目前的蓝牙部分还有各种各样的 Bug，emmmm……  
 
 ## 测试效果 
 [Bilibili BV13S4y1e7Yu](https://www.bilibili.com/video/BV13S4y1e7Yu)  
