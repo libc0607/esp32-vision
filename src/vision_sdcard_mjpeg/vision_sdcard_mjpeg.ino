@@ -770,6 +770,7 @@ void ble_task_loop(void * par) {
 
   while(1) {
     if (ble_connected == false) {
+      delay(500); 
       if (connectToServer(*pServerAddress)) {
         ble_connected = true; 
         Serial.println("BLE: Server UP");
