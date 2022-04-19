@@ -1,5 +1,5 @@
 /*
-   Vision V3.3 SD MJPEG WebServer OTA DEMO
+   Vision V3.3 SD MJPEG WebServer OTA BLE DEMO
    Github: libc0607/esp32-vision
 
    ref:
@@ -170,6 +170,11 @@ RTC_DATA_ATTR int lastTappedCount = 0;
  *  
  *  the BLE part: i just copied his code, no optimization
  *  See http://100-x-arduino.blogspot.com/2018/05/itag-i-arduino-ide-czy-esp32-otworzy.html
+ *  
+ *  About how to fix the memory leak of the iTag example, see
+ *    https://github.com/nkolban/esp32-snippets/issues/1006
+ *    https://github.com/nkolban/esp32-snippets/issues/786
+ *    
 */
 static BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
 static BLEUUID charUUID("0000ffe1-0000-1000-8000-00805f9b34fb"); 
@@ -177,6 +182,7 @@ static BLEAddress *pServerAddress;
 static boolean ble_doconnect = false;
 static boolean ble_connected = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
+static BLEClient* pClient;
 bool deviceBleConnected = false;
 bool ble_key_pressed = false;   // when ble got notify
 TaskHandle_t BLE_TaskHandle;
@@ -198,6 +204,8 @@ class MyClientCallbacks: public BLEClientCallbacks {
     }
 };
 
+MyClientCallbacks* callbacks = new MyClientCallbacks();
+
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData, size_t length, bool isNotify) {
@@ -206,11 +214,12 @@ static void notifyCallback(
 }
 
 bool connectToServer(BLEAddress pAddress) {
-  BLEClient* pClient  = BLEDevice::createClient();  
-  pClient->setClientCallbacks(new MyClientCallbacks()); 
+  if (pClient != nullptr) {
+    delete(pClient);
+  }
+  pClient = BLEDevice::createClient();  
+  pClient->setClientCallbacks(callbacks); 
   pClient->connect(pAddress); 
-
-  int ifconn = pClient->isConnected();
 
   BLERemoteService* pRemoteService = pClient->getService(serviceUUID); 
   if (pRemoteService == nullptr) {
@@ -752,9 +761,10 @@ void led_blink_task(void * par) {
 // key status is not here, it will be updated in notifyCallback()
 void ble_task_loop(void * par) {
 
-  bool last_ble_key_pressed = false;
+  //bool last_ble_key_pressed = false;
   ble_connected = false;
   deviceBleConnected = false;
+  String newValue = "T";  
   //Serial.print("BLE: task created on Core ");
   //Serial.println(xPortGetCoreID());
 
@@ -766,27 +776,28 @@ void ble_task_loop(void * par) {
       } else {
         Serial.println("BLE: Server DOWN");
         deviceBleConnected = false;
-        break;  // hot glue for BLE connection bug
+        //break;  // hot glue for BLE connection bug
       }
     }
-    
-    last_ble_key_pressed = ble_key_pressed;
+
+
+    //last_ble_key_pressed = ble_key_pressed;
     if (deviceBleConnected) {
-      if ((!ble_key_pressed) && last_ble_key_pressed) {   // if notify is cleared by main task 
-        Serial.print("+");        
-        String newValue = "T";                            // then send clear message to itag
+      //if ((!ble_key_pressed) && last_ble_key_pressed) {   // if notify is cleared by main task 
+        //Serial.print("+");        
+        // then send clear message to itag
         pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());  
-      } 
+      //} 
     }
-    // ~60Hz, allow cpu to switch to other tasks
-    // screen only ~20fps so it's enough
-    delay(17); 
+    
+    delay(500); 
   }
 
   // 由于我也不知道是itag的状态机bug 还是抄来的代码bug 还是我写的bug，
   // itag断连后重连就会崩
   // 所以就暂且让它能够在每次开机的第一次连接成功。。屎山上打补丁
   while(1) {
+    Serial.println("BLE: unexpected error, needs reset");
     delay(10000);     // hot glue for BLE connection bug
   }
 }
