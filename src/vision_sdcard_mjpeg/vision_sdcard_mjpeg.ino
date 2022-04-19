@@ -220,7 +220,8 @@ bool connectToServer(BLEAddress pAddress) {
   pClient = BLEDevice::createClient();  
   pClient->setClientCallbacks(callbacks); 
   pClient->connect(pAddress); 
-
+  if (!pClient->isConnected())
+    return false;
   BLERemoteService* pRemoteService = pClient->getService(serviceUUID); 
   if (pRemoteService == nullptr) {
     Serial.print("BLE: Failed to find our service UUID ");    
@@ -770,7 +771,7 @@ void ble_task_loop(void * par) {
 
   while(1) {
     if (ble_connected == false) {
-      delay(500); 
+      delay(500);
       if (connectToServer(*pServerAddress)) {
         ble_connected = true; 
         Serial.println("BLE: Server UP");
@@ -1019,6 +1020,7 @@ void setup()
     // init ble
     if (conf_ble_en) {
       BLEDevice::init(""); 
+      BLEDevice::setPower(ESP_PWR_LVL_N0);
       xTaskCreatePinnedToCore(
         ble_task_loop, "BLE_task",
         8192, NULL, 1,
