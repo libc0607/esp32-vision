@@ -73,8 +73,9 @@ const char* wifi_host = "vision";
 #define DEEP_SLEEP_SHORT_S  2
 #define DEEP_SLEEP_SHORT_CNT  6
 #define TEMP_PROTECT_HIGH_THRESH_12B  1840 // ~60°C @10k,B3380
-#define LCD_BACKLIGHT_MIN_8B  32
+#define LCD_BACKLIGHT_MIN_12B  640
 #define LCD_PWM_FIR_LEN 32
+#define LCD_PWM_CHANGE_MAX_STEP 32
 #define VIDEO_A_SETUP   "/a_setup.mjpeg"
 #define VIDEO_B_SETUP   "/b_setup.mjpeg"
 #define VIDEO_A_LOOP    "/a_loop.mjpeg"
@@ -144,13 +145,12 @@ static MjpegClass mjpeg;
 uint8_t *mjpeg_buf;
 
 unsigned long lightsleep_ms;
-uint8_t lcd_pwm_filter[LCD_PWM_FIR_LEN] = {LCD_BACKLIGHT_MIN_8B};
-uint8_t p_lcd_pwm_filter;
+TaskHandle_t LCD_BL_TaskHandle;
+xQueueHandle lcd_bl_queue;
 
 WebServer server(80);
 static bool hasSD = false;
 File uploadFile;
-uint8_t lcd_brightness;
 int led_status;
 
 RTC_DATA_ATTR int bootCount = 0;
@@ -718,23 +718,54 @@ void printErrorMessage(uint8_t e, bool eol = true) {
     Serial.println();
 }
 
-uint8_t get_lcd_brightness_by_adc (int adc_pin) {
-  return uint8_t(( pow((analogRead(adc_pin)/4096.0), 2.0) * float(255-LCD_BACKLIGHT_MIN_8B) ) + LCD_BACKLIGHT_MIN_8B);
-}
+// LCD Backlight refresh
+void lcd_bl_task(void * par) {
+  int lcd_enable = 0;
+  int i;
+  BaseType_t x_stat;
+  TickType_t x_timeout = pdMS_TO_TICKS(10);
+  //uint16_t bl;
+  uint16_t lcd_pwm_filter[LCD_PWM_FIR_LEN];
+  uint16_t p_lcd_pwm_filter;
+  uint32_t sum = 0;
+  uint16_t avg_map, last_val; 
 
-uint8_t lcd_pwm_fir_filter (uint8_t pwm_val) {
-  uint32_t lcd_pwm_filter_sum = 0;
-  
-  lcd_pwm_filter[p_lcd_pwm_filter] = pwm_val;
-  p_lcd_pwm_filter++;
-  if (p_lcd_pwm_filter == sizeof(lcd_pwm_filter)) {
-    p_lcd_pwm_filter = 0;
+  for (i=0; i<LCD_PWM_FIR_LEN; i++) {
+    //Serial.print(lcd_pwm_filter[i]);Serial.print(".");
+    lcd_pwm_filter[i] = 0;
   }
-  for (int i=0; i<sizeof(lcd_pwm_filter); i++) {
-    lcd_pwm_filter_sum += lcd_pwm_filter[i];
-  }
+  last_val = LCD_BACKLIGHT_MIN_12B;
   
-  return (lcd_pwm_filter_sum/sizeof(lcd_pwm_filter));
+  //Serial.println("startloop");
+  while(1) {
+    x_stat = xQueueReceive(lcd_bl_queue, &lcd_enable, x_timeout);
+    if (lcd_enable) {
+      lcd_pwm_filter[p_lcd_pwm_filter] = analogRead(PIN_SENSOR_ADC);
+      p_lcd_pwm_filter++;
+      if (p_lcd_pwm_filter == LCD_PWM_FIR_LEN) {
+        p_lcd_pwm_filter = 0;
+      }
+      sum = 0;
+      for (i=0; i<LCD_PWM_FIR_LEN; i++) {
+        sum += lcd_pwm_filter[i];
+        //Serial.print(lcd_pwm_filter[i]);Serial.print(".");
+      }
+      avg_map = map(sum/LCD_PWM_FIR_LEN, 
+                    0, 4095, LCD_BACKLIGHT_MIN_12B, 4095);
+      if (avg_map - last_val > LCD_PWM_CHANGE_MAX_STEP) {
+        ledcWrite(1, last_val + LCD_PWM_CHANGE_MAX_STEP); 
+      } else if (last_val - avg_map > LCD_PWM_CHANGE_MAX_STEP) {
+        ledcWrite(1, last_val - LCD_PWM_CHANGE_MAX_STEP); 
+      } else {
+        ledcWrite(1, avg_map); 
+      }
+      last_val = avg_map;
+      //Serial.println(avg_map);
+    } else {
+      ledcWrite(1, 0);
+    }
+    vTaskDelay(pdMS_TO_TICKS(16));    // ~60Hz
+  }
 }
 
 void led_blink_task(void * par) {
@@ -744,6 +775,8 @@ void led_blink_task(void * par) {
   TickType_t x_timeout = pdMS_TO_TICKS(100);
 
   while(1) {
+    //Serial.println(ESP.getFreeHeap());
+    
     x_stat = xQueueReceive(led_queue, &led_blink_cnt, x_timeout);
     //if (x_stat != pdPASS) {
     //  led_blink_cnt = 1;
@@ -805,9 +838,10 @@ void ble_task_loop(void * par) {
 }
 
 void lock_screen_handler(bool reset_ble) {
+  int lcd_bl_en = 0;
   while(digitalRead(PIN_KEY) == LOW);
   Serial.println("Light sleep start");
-  ledcWrite(1, 0);
+  xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));   
   digitalWrite(PIN_LED, LOW); delay(50);
   digitalWrite(PIN_LED, HIGH); 
   gfx->displayOff();
@@ -829,6 +863,8 @@ void lock_screen_handler(bool reset_ble) {
   }
   while(digitalRead(PIN_KEY) == LOW); // wait for key release
   delay(50);  // ~20fps, 1 frame
+  lcd_bl_en = 1;
+  xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));   
 }
 
 void check_battery_then_deep_sleep() {
@@ -855,6 +891,7 @@ void setup()
   File * pvFile;
   File vFiles[4];
   int led_blink_cnt = 0;
+  int lcd_bl_en = 0;
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
@@ -910,9 +947,8 @@ void setup()
 
   gfx->begin();
   gfx->fillScreen(BLACK);
-  p_lcd_pwm_filter = 0;
   ledcAttachPin(PIN_TFT_BL, 1);
-  ledcSetup(1, 12000, 8);
+  ledcSetup(1, 18000, 12);
   ledcWrite(1, 0);
 
   SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_SD_CS);
@@ -1012,7 +1048,13 @@ void setup()
   }
 
   digitalWrite(PIN_LED, HIGH); // startup blink 
-  
+  // set lcd backlight task
+  lcd_bl_queue = xQueueCreate(8, sizeof(int));
+  xTaskCreatePinnedToCore(
+      lcd_bl_task, "LCD_BL_task",
+      4096, NULL, 1,
+      &LCD_BL_TaskHandle, 0);
+        
   if (rst_reason == DEEPSLEEP_RESET) {
     
     gfx->setRotation(conf_lcd_rotation);
@@ -1031,12 +1073,11 @@ void setup()
     led_queue = xQueueCreate(8, sizeof(int));
     xTaskCreatePinnedToCore(
         led_blink_task, "LED_task",
-        8192, NULL, 1,
+        4096, NULL, 1,
         &LED_TaskHandle, 0);
-
-    // wakeup by accel. or timer
-    // play GIF
-    ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
+    
+    lcd_bl_en = 1;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));    
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
       lastTappedCount = bootCount;
@@ -1097,8 +1138,7 @@ void setup()
           } 
 
           SD.begin(PIN_SD_CS);                  // 5. hardware magics
-          ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
-  
+          
           // 6. set file position
           if (conf_ble_en) {
             if (video_part_a) {
@@ -1164,7 +1204,6 @@ void setup()
             lastTappedCount = bootCount;
           } 
           SD.begin(PIN_SD_CS);  
-          ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
         }
       }// loop_mode=false
       Serial.println("MJPEG video end");
@@ -1176,8 +1215,8 @@ void setup()
         }
       }
     }
-
-    ledcWrite(1, 0);
+    lcd_bl_en = 0;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));  
     ledcDetachPin(PIN_TFT_BL);
     digitalWrite(PIN_LED, HIGH);
     Serial.println(F("deep sleep"));
@@ -1201,7 +1240,8 @@ void setup()
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_MINUS_1dBm);
     WiFi.begin(wifi_ssid, wifi_pwd);
-    ledcWrite(1, LCD_BACKLIGHT_MIN_8B);  // brightness
+    lcd_bl_en = 1;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));  
     
     int wifi_cnt = 0;
     while (WiFi.status() != WL_CONNECTED ) {
@@ -1254,12 +1294,14 @@ void setup()
 void loop()
 {
   bool exit_loop = false;
+  int lcd_bl_en;
   
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
     delay(2);//allow the cpu to switch to other tasks
     
-    ledcWrite(1, lcd_pwm_fir_filter(get_lcd_brightness_by_adc(PIN_SENSOR_ADC)));
+    lcd_bl_en = 1;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));  
     
     // 退出webserver进入深睡条件：按下按键
     if (digitalRead(PIN_KEY) == LOW) {
@@ -1277,11 +1319,13 @@ void loop()
   if (exit_loop) {
     Serial.println(F("init done, deep sleep now"));
     gfx->begin();
-    ledcWrite(1, LCD_BACKLIGHT_MIN_8B);
+    lcd_bl_en = 1;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1)); 
     gfx->fillScreen(GREEN); 
     delay(500);
     gfx->fillScreen(BLACK);
-    ledcWrite(1, 0);
+    lcd_bl_en = 0;
+    xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));  
     ledcDetachPin(PIN_TFT_BL);
     delay(5);
     gfx->displayOff();
