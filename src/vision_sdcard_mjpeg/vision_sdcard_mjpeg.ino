@@ -31,21 +31,21 @@
     video=/loop.mjpeg
     lcd_rotation=0
     loop_mode=false
-    ble_en=false
+    abloop_en=false
     ble_mac=00:12:34:56:78:9a
 
    There are 3 working modes:
-    a. Loop video A or B, controlled by iTag;
+    a. Loop video A or B, controlled by iTag or double tap;
       you should: 
         set loop_mode = true
-        set ble_en = true
-        set ble_mac to your iTag MAC address
+        set abloop_en = true
+        if u have an iTag, set ble_mac to your iTag MAC address; else, delete ble_mac  
         upload /a_setup.mjpeg, /a_loop.mjpeg, /b_setup.mjpeg, /b_loop.mjpeg
     b. Loop one video;
       u should:
         upload video (e.g. hydro.mjpeg)
         set loop_mode = true
-        set ble_en = false
+        set abloop_en = false
         set video = hydro.mjpeg
     c. play video once, then deep sleep; wakeup by double tap;
       u should:
@@ -59,7 +59,6 @@
    就是抄了一大堆例程，并小心地让它们能一起工作而已。很烂，轻喷
 
 */
-
 #define CONFIG_FILENAME "/config.txt"
 const char* wifi_ssid = "Celestia";
 const char* wifi_pwd = "mimitomo";
@@ -134,11 +133,10 @@ const char* wifi_host = "vision";
 #define MJPEG_BUFFER_SIZE (240 * 240 * 2 / 4)
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_TFT_DC/* DC */, PIN_TFT_CS /* CS */, PIN_SCK, PIN_MOSI, PIN_MISO, VSPI, true );
-//Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
 Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
+//Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
 
 DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
-
 
 #include "MjpegClass.h"
 static MjpegClass mjpeg;
@@ -884,6 +882,7 @@ void setup()
 //  bool conf_gravity = CONF_GRAVITY_DEFAULT;
   int conf_lcd_rotation = CONF_LCD_ROTATION_DEFAULT;
   bool conf_loop_mode = CONF_LOOP_MODE_DEFAULT;
+  bool conf_abloop_en = false;
   bool conf_ble_en = false;
   bool video_part_a = true;   // true=partA, false=partB
   int last_key_state = HIGH;
@@ -892,6 +891,7 @@ void setup()
   File vFiles[4];
   int led_blink_cnt = 0;
   int lcd_bl_en = 0;
+  int last_acc_int1 = LOW, acc_int1 = LOW;
 
   WiFi.mode(WIFI_OFF);
   bootCount++;
@@ -976,9 +976,9 @@ void setup()
 //      conf_file.print("gravity="); conf_file.println(CONF_GRAVITY_DEFAULT? "true": "false"); 
       conf_file.print("lcd_rotation="); conf_file.println(CONF_LCD_ROTATION_DEFAULT);
       conf_file.print("loop_mode="); conf_file.println(CONF_LOOP_MODE_DEFAULT? "true": "false");
-      conf_file.println("ble_en=false"); 
+      conf_file.println("abloop_en=false"); 
       conf_file.println("ble_mac=00:12:34:56:78:9a"); 
-      conf_file.println("# when enable ble ctrl, rename video to "VIDEO_A_SETUP", "VIDEO_B_SETUP", "VIDEO_A_LOOP", "VIDEO_A_LOOP";"); 
+      conf_file.println("# when enable abloop, rename video to "VIDEO_A_SETUP", "VIDEO_B_SETUP", "VIDEO_A_LOOP", "VIDEO_A_LOOP";"); 
       conf_file.close();
     }
   }
@@ -1001,22 +1001,23 @@ void setup()
     Serial.print("<vision.video> not found; use vision.video.default=");
     Serial.println(conf_gifname);
   }
-  if (ini.getValue("vision", "ble_en", conf_buf, buf_len, conf_ble_en)) {
-    //Serial.print("vision.ble_en=");
-    //Serial.println(conf_ble_en ? "true" : "false");
+  if (ini.getValue("vision", "abloop_en", conf_buf, buf_len, conf_abloop_en)) {
+    //Serial.print("vision.abloop_en=");
+    //Serial.println(conf_abloop_en ? "true" : "false");
   } else {
     printErrorMessage(ini.getError());
-    Serial.println("<vision.ble_en> not found; use vision.ble_en.default=false");
+    Serial.println("<vision.abloop_en> not found; use vision.abloop_en.default=false");
   }
-  if (conf_ble_en) {
+  if (conf_abloop_en) {
     if (ini.getValue("vision", "ble_mac", conf_buf, buf_len)) {
       pServerAddress = new BLEAddress(String(conf_buf).c_str());
       //Serial.print("vision.ble_mac=");
       //Serial.println(String(conf_buf));
+      conf_ble_en = true;
     } else {
       printErrorMessage(ini.getError());
-      Serial.println("<vision.ble_mac> not found; disable ble.");
-      conf_ble_en = false;
+      Serial.println("<vision.ble_mac> not found.");
+      //conf_abloop_en = false;
     }
   }
 /*
@@ -1036,7 +1037,7 @@ void setup()
     Serial.print("<vision.loop_mode> not found; use vision.loop_mode.default=");
     Serial.println(conf_loop_mode ? "true" : "false");
   }
-  conf_ble_en = conf_loop_mode? conf_ble_en: false;
+  conf_abloop_en = conf_loop_mode? conf_abloop_en: false;
   if (ini.getValue("vision", "lcd_rotation", conf_buf, buf_len)) {
     conf_lcd_rotation = String(conf_buf).toInt();
     //Serial.print("vision.lcd_rotation=");
@@ -1062,7 +1063,7 @@ void setup()
     // init ble
     if (conf_ble_en) {
       BLEDevice::init(""); 
-      BLEDevice::setPower(ESP_PWR_LVL_N0);
+      BLEDevice::setPower(ESP_PWR_LVL_P3);
       xTaskCreatePinnedToCore(
         ble_task_loop, "BLE_task",
         8192, NULL, 1,
@@ -1087,7 +1088,7 @@ void setup()
     if (!mjpeg_buf) {
       Serial.println(F("mjpeg_buf malloc failed!"));
     }
-    if (conf_ble_en) {
+    if (conf_abloop_en) {
       vFiles[0] = FILE_SYSTEM.open(VIDEO_A_SETUP);
       vFiles[1] = FILE_SYSTEM.open(VIDEO_A_LOOP);
       vFiles[2] = FILE_SYSTEM.open(VIDEO_B_SETUP);
@@ -1095,11 +1096,12 @@ void setup()
       pvFile = &vFiles[1];
       for (i=0; i<4; i++) {
         if (!vFiles[i]) {
-          conf_ble_en = false;
+          conf_abloop_en = false;
+          Serial.println("abloop file error, disable");
         }
       }
     } 
-    if (!conf_ble_en) {
+    if (!conf_abloop_en) {
       vFiles[0] = FILE_SYSTEM.open(conf_gifname);
       pvFile = &vFiles[0];
     }
@@ -1114,9 +1116,13 @@ void setup()
           mjpeg.readMjpegBuf();                 // 1. read, decode & render jpeg frame;
           mjpeg.drawJpg();
           //Serial.print(".");
-          
-          if (ble_key_pressed) {                // 2. check BLE itag status
+
+          last_acc_int1 = acc_int1;
+          acc_int1 = digitalRead(PIN_ACC_INT1);
+          if (ble_key_pressed                   // 2. check BLE itag & acce status
+              || (acc_int1 == HIGH && last_acc_int1 == LOW)) {  
             ble_key_pressed = false;
+            tapEvent = acce.tapDetect();
             if (pvFile == &vFiles[1] || pvFile == &vFiles[3]) {
               // only accept switch a/b when looping
               video_part_a = !video_part_a;    
@@ -1133,14 +1139,14 @@ void setup()
           key_state = digitalRead(PIN_KEY);
           if (last_key_state == LOW && key_state == LOW) {  
             lastTappedCount = bootCount;
-            //lock_screen_handler(conf_ble_en);
+            //lock_screen_handler(conf_abloop_en);
             lock_screen_handler(false);
           } 
 
           SD.begin(PIN_SD_CS);                  // 5. hardware magics
           
           // 6. set file position
-          if (conf_ble_en) {
+          if (conf_abloop_en) {
             if (video_part_a) {
               // 6.1 needs to switch to video A
               // 6.1.1 it's looping A now, then just loop A
