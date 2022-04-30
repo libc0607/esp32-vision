@@ -63,32 +63,28 @@
 
 ```
  [vision]
- video=/loop.mjpeg       # 要播放的文件名。需要以 / 开头，并且文件名不要超过 8 个字符（短文件名），不然会出bug
- lcd_rotation=0          # LCD 的方向。取值范围 0~3，对应 0°, 90°, 180°, 270°，根据实际情况修改
- loop_mode=false         # true：循环播放视频模式，不会自动息屏；但依然可以用按键进入浅睡息屏模式，该模式下快速唤醒；浅睡不算很省电
-                         # false：单次播放模式，播放一次后进入深睡，深睡模式下支持双击唤醒；从唤醒到播放需要几秒，但深睡省电
-                         # 循环模式优先级：配置文件>冷启按键时方向>默认值
- ble_en=false            # BLE 开关
- ble_mac=00:12:34:56:78:9a   # 你的 iTag 的 MAC 地址。可以通过例如 nRF Connect 这样的应用查看。
- 
+ video=/loop.mjpeg           # 要播放的文件名。需要以 / 开头，并且文件名不要超过 8 个字符（短文件名），不然会出bug
+ lcd_rotation=0              # LCD 的方向。取值范围 0~3，对应 0°, 90°, 180°, 270°，根据实际情况修改
+ loop_mode=false             # 循环开关
+ abloop_en=false             # 使能两段视频切换
+ ble_mac=00:12:34:56:78:9a   # 你的 iTag 的 MAC 地址。可以通过例如 nRF Connect 这样的应用查看
 ```
 目前的设定中，有 3 种工作模式：  
-(a). 循环播放两段视频，通过 iTag 控制两段视频的切换  
+(a). 循环播放两段视频，通过 iTag 或双击来控制两段视频的切换  
  该模式下需要剪出 4 段视频，两个循环片段 a_loop 及 b_loop，以及两个过渡片段 a_setup 和 b_setup；   
  - loop_mode = true
- - ble_en = true
+ - abloop_en = true
  - ble_mac = \<iTag MAC address\>
  - 上传 /a_setup.mjpeg, /a_loop.mjpeg, /b_setup.mjpeg, /b_loop.mjpeg  
- 
- 需要先开启 iTag，然后给神之眼开机；  
- 可能仍存在 bug；Light Sleep后蓝牙连接会断开，需要等几秒才会重新连接  
+  
+ Light Sleep后蓝牙连接会断开，需要等几秒才会重新连接  
  LED 会指示当前正在播放的是 A 视频还是 B 视频；  
  
 (b). 循环单个视频
   该模式需要一段视频
  - 上传视频 (例如 hydro.mjpeg)
  - loop_mode = true
- - ble_en = false
+ - abloop_en = false
  - video = hydro.mjpeg
  
  (c). 单次播放后进入睡眠，通过双击唤醒
