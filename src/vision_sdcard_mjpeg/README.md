@@ -10,6 +10,7 @@
 ## 硬件
 目前版本的代码可配合 硬件版本 V3.3 使用。  
 蓝牙按钮使用一种叫做 iTag 的防丢器，它的协议相比模拟 HID 键盘的蓝牙按钮要简单很多，比如淘宝上的 [这个](https://item.taobao.com/item.htm?id=556798481873)  
+关于如何将 iTag 作为 ESP32 的输入按钮使用，这里有一个最小化的例程： [ble_itag_demo](https://github.com/libc0607/esp32-vision/tree/main/src/ble_itag_demo)  
 
 这个例子没有使用到板上那个 0402 封装的 NTC；其他的电路，包括外接的环境光传感器以及 NTC 电阻都需要焊接才能正常工作。  
 这个例子通过修改代码的方式同时支持 方版（ST7789）和 圆版（GC9A01），修改方式见下文。  
