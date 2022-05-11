@@ -33,7 +33,7 @@
     loop_mode=false
     abloop_en=false
     ble_mac=00:12:34:56:78:9a
-
+    
    There are 3 working modes:
     a. Loop video A or B, controlled by iTag or double tap;
       you should: 
@@ -79,6 +79,8 @@ const char* wifi_host = "vision";
 #define VIDEO_B_SETUP   "/b_setup.mjpeg"
 #define VIDEO_A_LOOP    "/a_loop.mjpeg"
 #define VIDEO_B_LOOP    "/b_loop.mjpeg"
+#define LOCK_SCREEN_TIME_THRESH_MS 1000
+#define BL_LEVEL_MAX 4095
 
 #define FILE_SYSTEM  SD
 
@@ -133,8 +135,8 @@ const char* wifi_host = "vision";
 #define MJPEG_BUFFER_SIZE (240 * 240 * 2 / 4)
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_TFT_DC/* DC */, PIN_TFT_CS /* CS */, PIN_SCK, PIN_MOSI, PIN_MISO, VSPI, true );
-Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
-//Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
+//Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
+Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
 
 DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 
@@ -737,7 +739,9 @@ void lcd_bl_task(void * par) {
   //Serial.println("startloop");
   while(1) {
     x_stat = xQueueReceive(lcd_bl_queue, &lcd_enable, x_timeout);
-    if (lcd_enable) {
+    if (lcd_enable == BL_LEVEL_MAX) {
+      ledcWrite(1, BL_LEVEL_MAX);
+    } else if (lcd_enable > 0) {
       lcd_pwm_filter[p_lcd_pwm_filter] = analogRead(PIN_SENSOR_ADC);
       p_lcd_pwm_filter++;
       if (p_lcd_pwm_filter == LCD_PWM_FIR_LEN) {
@@ -749,7 +753,7 @@ void lcd_bl_task(void * par) {
         //Serial.print(lcd_pwm_filter[i]);Serial.print(".");
       }
       avg_map = map(sum/LCD_PWM_FIR_LEN, 
-                    0, 4095, LCD_BACKLIGHT_MIN_12B, 4095);
+                    0, BL_LEVEL_MAX, LCD_BACKLIGHT_MIN_12B, BL_LEVEL_MAX);
       if (avg_map - last_val > LCD_PWM_CHANGE_MAX_STEP) {
         ledcWrite(1, last_val + LCD_PWM_CHANGE_MAX_STEP); 
       } else if (last_val - avg_map > LCD_PWM_CHANGE_MAX_STEP) {
@@ -837,20 +841,38 @@ void ble_task_loop(void * par) {
 
 void lock_screen_handler(bool reset_ble) {
   int lcd_bl_en = 0;
+  uint64_t ts_down, ts_up;
+
+  ts_down = millis();
   while(digitalRead(PIN_KEY) == LOW);
-  Serial.println("Light sleep start");
+  ts_up = millis();
+  if (ts_up - ts_down > LOCK_SCREEN_TIME_THRESH_MS) {
+    lcd_bl_en = BL_LEVEL_MAX;
+    Serial.println("Light sleep start, but keep LCD on");
+  } else {
+    Serial.println("Light sleep start, turn off LCD");
+  }
   xQueueSendToFront(lcd_bl_queue, &lcd_bl_en, pdMS_TO_TICKS(1));   
-  digitalWrite(PIN_LED, LOW); delay(50);
-  digitalWrite(PIN_LED, HIGH); 
-  gfx->displayOff();
+  digitalWrite(PIN_LED, LOW); delay(50); digitalWrite(PIN_LED, HIGH); 
+  if (lcd_bl_en == 0) {
+    gfx->displayOff();
+  } 
   lightsleep_ms = millis();
   gpio_wakeup_enable((gpio_num_t)PIN_KEY, GPIO_INTR_LOW_LEVEL);
+  gpio_hold_en(( gpio_num_t ) PIN_LCD_PWR_EN );
+  gpio_hold_en(( gpio_num_t ) PIN_TFT_BL );
   esp_sleep_enable_gpio_wakeup();
-  esp_light_sleep_start();
+  
+  esp_light_sleep_start();        //============================
+    
   lightsleep_ms = millis() - lightsleep_ms;
   Serial.print("Wakeup from light sleep, ");
   Serial.print(lightsleep_ms); Serial.println("ms");
-  gfx->begin();
+  gpio_hold_dis(( gpio_num_t ) PIN_LCD_PWR_EN );
+  gpio_hold_dis(( gpio_num_t ) PIN_TFT_BL );
+  if (lcd_bl_en == 0) {
+    gfx->begin();
+  } 
   if (reset_ble) {
     vTaskDelete(BLE_TaskHandle);
     BLEDevice::init(""); 
@@ -928,7 +950,7 @@ void setup()
   //acce.enableTapDetectionOnX(true);
   acce.setTapThresholdOnY(0.8);
   acce.setTapThresholdOnZ(0.8);
-  //acce.setTapThresholdOnX(0.6);
+  //acce.setTapThresholdOnX(0.8);
   acce.setTapDur(3);
   acce.setTapMode(DFRobot_LIS2DW12::eBothSingleDouble);
   acce.setInt1Event(DFRobot_LIS2DW12::eDoubleTap);
