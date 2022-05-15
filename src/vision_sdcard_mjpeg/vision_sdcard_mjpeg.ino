@@ -130,13 +130,14 @@ const char* wifi_host = "vision";
 
 #define WIFI_CONNECT_TIMEOUT_S 20
 #define uS_TO_S_FACTOR (1000000ULL)
-#define BAT_ADC_THRESH_LOW   (1700)  // analogRead( 1/2*Vbat )
-#define BAT_ADC_THRESH_WARN  (1880)  // analogRead( 1/2*Vbat )
+//#define BAT_ADC_THRESH_LOW   (1700)  // analogRead( 1/2*Vbat )
+#define BAT_ADC_THRESH_LOW_MV   (2900)  // analogReadMilliVolts(Vbat)
+//#define BAT_ADC_THRESH_WARN  (1880)  // analogRead( 1/2*Vbat )
 #define MJPEG_BUFFER_SIZE (240 * 240 * 2 / 4)
 
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_TFT_DC/* DC */, PIN_TFT_CS /* CS */, PIN_SCK, PIN_MOSI, PIN_MISO, VSPI, true );
-//Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
-Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
+Arduino_ST7789  *gfx = new Arduino_ST7789(bus, PIN_TFT_RST, 0, true, 240, 240, 0, 0, 0, 80);
+//Arduino_GC9A01  *gfx = new Arduino_GC9A01(bus, PIN_TFT_RST, 2, true); 
 
 DFRobot_LIS2DW12_I2C acce(&Wire, 0x19);   // sdo/sa0 internal pull-up
 
@@ -478,46 +479,46 @@ void getStatus() {
   } else {
     stat += "Card_UNKNOWN";
   }
-  stat += ",";
+  stat += ", ";
 
   // card space
-  //stat += "Total_MB,";
+  stat += String(int(FILE_SYSTEM.usedBytes() / (1024 * 1024))); 
+  stat += "MB/";
   stat += String(int(FILE_SYSTEM.totalBytes() / (1024 * 1024)));
-  //stat += "MB,Used_MB,";
-  stat += "MB,";
-  stat += String(int(FILE_SYSTEM.usedBytes() / (1024 * 1024)));
-  stat += "MB,";
+  stat += "MB, ";
   // Battery info
   //stat += "Battery_ADC,";
-  stat += analogRead(PIN_ADC_BAT);
+  //stat += analogRead(PIN_ADC_BAT);
+  stat += (2*analogReadMilliVolts(PIN_ADC_BAT)); stat += "mV";
   //stat += ",Charger,";
-  stat += ",";
+  stat += ", ";
   if (digitalRead(PIN_BAT_CHRG) == LOW) {
-    stat += "charging,";
+    stat += "Charging, ";
   } else if (digitalRead(PIN_BAT_STDBY) == LOW) {
-    stat += "full,";
+    stat += "Full, ";
   } else {
-    stat += "not_charging,";
+    stat += "NotCharging, ";
   }
 
   // light sensor info
   //stat += "Light_ADC,";
   stat += analogRead(PIN_SENSOR_ADC);
-
+  stat += "/4095, ";
+  
   // acce.
-  stat += ",X,";
+  stat += "X, ";
   stat += acce.readAccX();
-  stat += ",Y,";
+  stat += "mg, Y, ";
   stat += acce.readAccY();
-  stat += ",Z,";
+  stat += "mg, Z, ";
   stat += acce.readAccZ();
-  stat += ",";
+  stat += "mg, ";
   
   // firmware info
-  stat += __TIME__ ;
-  stat += ",";
   stat += __DATE__ ;
-  stat += ",\r\n";
+  stat += " ";
+  stat += __TIME__ ; 
+  stat += "\r\n";
   server.send(200, "text/plain", stat);
 }
 
@@ -888,7 +889,7 @@ void lock_screen_handler(bool reset_ble) {
 }
 
 void check_battery_then_deep_sleep() {
-  if (analogRead(PIN_ADC_BAT) < BAT_ADC_THRESH_LOW) {
+  if (analogReadMilliVolts(PIN_ADC_BAT) * 2 < BAT_ADC_THRESH_LOW_MV) {
     // just go sleep if battery low
     Serial.println("battery low, deep sleep start");
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_LONG_S * uS_TO_S_FACTOR);
