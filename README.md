@@ -1,14 +1,13 @@
 # ESP32 神之眼 Genshin Impact Vision
-用 ESP32 做个~~下北泽~~神之眼    
 
-测试视频：  
+[![Inazuma_Electro_Demo](https://res.cloudinary.com/marcomontalbano/image/upload/v1656770471/video_to_markdown/images/youtube--uiCPUxYVVak-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=uiCPUxYVVak "Inazuma_Electro_Demo")  
+
 [Bilibili BV1Fr4y1z7yS: 下北泽元素力测试](https://www.bilibili.com/video/BV1Fr4y1z7yS)  
 [Bilibili BV1ir4y1r7ZS: 给刻师傅做个神之眼](https://www.bilibili.com/video/BV1ir4y1r7ZS)  
 [Bilibili BV1hS4y1D7fo：蒙德外壳+圆版 测试](https://www.bilibili.com/video/BV1hS4y1D7fo)  
 [Bilibili BV1a34y1s7b5：稻妻外壳+圆版 测试](https://www.bilibili.com/video/BV1a34y1s7b5)  
 [Bilibili BV13S4y1e7Yu：蓝牙切换视频测试](https://www.bilibili.com/video/BV13S4y1e7Yu)  
 
-![image](https://github.com/libc0607/esp32-vision/raw/main/img/demo-mondstadt-yjsnpi.gif)   
 
 **警告：如果你没有能够完全理解整个设计的能力，那就不推荐做。** 因为我也不知道又会遇到什么坑  
 
@@ -37,6 +36,10 @@
  
 本设计的整体思路是尽量省电，虽然 V3.3 增加了电池容量（…），但受体积限制和屏幕拖累，续航还是尿崩  
 你可以通过修改配置文件，在显示效果和续航间选择合适的平衡；详见 [vision_sdcard_mjpeg](https://github.com/libc0607/esp32-vision/tree/main/src/vision_sdcard_mjpeg)  
+
+由于 2022 年 6 月的某个时候嘉立创将 ESP32-PICO-D4 踢出了经济型 SMT，考虑到少量自制的可制造性，未来本设计很可能会因此做出一些调整；  
+但 V3.3 已经是一个相对稳定的版本，如果你等不及了可以做或是自己修改  
+根据目前（2022.7.2）的[信息](https://t.me/paimon_leaks/1783)来看，须弥应该也是圆的，我猜电路大概是还能用的（吧…？），所以应该不用再大改了  
 
 ## PCB 设计  
 PCB 圆版：   
