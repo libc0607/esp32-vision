@@ -19,6 +19,23 @@
 见 [libc0607/vision-c3-youth](https://github.com/libc0607/vision-c3-youth)   
 但我没有在量产，在卖的都不是我，所以我不是客服，遇到问题你自己看看源码（  
 
+## 我想自己做一个，且不怕翻车，该从哪开始？ 
+但是真的很容易翻车，如果你真的想好了……。  
+你可以先看 [渣渣一块钱4个：电子版璃月神之眼制作教程](https://www.bilibili.com/video/BV1HS4y1b7tQ)，大体流程是相同的  
+
+ - 参考 [PCB 设计](https://github.com/libc0607/esp32-vision#pcb-%E8%AE%BE%E8%AE%A1) 一节中的链接，在 LCEDA 中[导出 Gerber](https://docs.lceda.cn/cn/PCB/Gerber-Generate/index.html)，送到嘉立创下单（[PCB 下单指引](https://www.jlc.com/portal/server_guide_35092.html)）  
+ - 如果你对自己的焊接水平没有自信，需要 SMT，还需要[导出 BOM](https://docs.lceda.cn/cn/Schematic/Export-BOM/index.html) 以及[贴片坐标](https://docs.lceda.cn/cn/PCB/Export-Coordinate/index.html)，参照[嘉立创的下单教程](https://www.jlc.com/portal/server_guide_35102.html)进行 SMT 下单
+ - 拿到 PCB 后完成全部元件焊接，确保硬件没有问题 
+ - 在 [Arduino IDE](https://www.arduino.cc/en/software) 中装好 [arduino-esp32](https://github.com/espressif/arduino-esp32) 环境，并按照代码前的注释信息安装好其他依赖  
+ - 按照代码前的注释信息，编译并上传程序至板载的 ESP32 中，测试基本功能是否正常；你应该使用带有 EN 和 IO0 接口的 ESP32 下载器   
+ - 下载[外壳的 STL 文件](https://github.com/libc0607/esp32-vision/tree/main/stl)，通过 3D 打印制作外壳；你也许会想要在 [三维猴](https://www.sanweihou.com/) 或 [未来工厂](https://www.wenext.cn/) 下单  
+ - 将打印好的外壳进行打磨及喷漆，可以参考 [渣渣一块钱4个：外壳喷漆教程](https://www.bilibili.com/video/BV1cY4y1a7CQ) 
+ - 按照对应[外壳文件夹](https://github.com/libc0607/esp32-vision/tree/main/stl)下的 README 进行外壳及整机的组装  
+ - 按照 [代码 README](https://github.com/libc0607/esp32-vision/tree/main/src/vision_sdcard_mjpeg) 下的指引，上传文件至内部存储中，并进行参数配置
+ - Enjoy!
+ 
+如果你想在 渣渣一块钱四个 的设计中，移植使用蓝牙 iTag 进行遥控的代码，这里有一个我整理出来的最小示例大概能帮到你：[ble_itag_demo](https://github.com/libc0607/esp32-vision/blob/main/src/ble_itag_demo/ble_itag_demo.ino)  
+ 
 ## 硬件特性
 以下描述的是 V3.3 版本的特性：  
  - 1.54 寸 LCD（方版）或 1.28 寸 LCD （圆版）
@@ -37,9 +54,8 @@
 本设计的整体思路是尽量省电，虽然 V3.3 增加了电池容量（…），但受体积限制和屏幕拖累，续航还是尿崩  
 你可以通过修改配置文件，在显示效果和续航间选择合适的平衡；详见 [vision_sdcard_mjpeg](https://github.com/libc0607/esp32-vision/tree/main/src/vision_sdcard_mjpeg)  
 
-由于 2022 年 6 月的某个时候嘉立创将 ESP32-PICO-D4 踢出了经济型 SMT，考虑到少量自制的可制造性，未来本设计很可能会因此做出一些调整；  
-但 V3.3 已经是一个相对稳定的版本，如果你等不及了可以做或是自己修改  
-根据目前（2022.7.2）的[信息](https://t.me/paimon_leaks/1783)来看，须弥应该也是圆的，我猜电路大概是还能用的（吧…？），所以应该不用再大改了  
+由于 2022 年 6 月的某个时候嘉立创将 ESP32-PICO-D4 踢出了经济型 SMT，考虑到少量自制的可制造性，未来本设计很可能会因此做出一些调整；但 V3.3 已经是一个相对稳定的版本，如果你等不及了可以做或是自己修改。  
+根据目前（2022.7）的[信息](https://t.me/avocado_leaks/4980)来看，须弥也是圆的，我猜电路大概是还能用的（吧…？），所以应该不用再大改了  
 
 ## PCB 设计  
 PCB 圆版：   
