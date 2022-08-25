@@ -7,6 +7,7 @@
 [Bilibili BV1hS4y1D7fo：蒙德外壳+圆版 测试](https://www.bilibili.com/video/BV1hS4y1D7fo)  
 [Bilibili BV1a34y1s7b5：稻妻外壳+圆版 测试](https://www.bilibili.com/video/BV1a34y1s7b5)  
 [Bilibili BV13S4y1e7Yu：蓝牙切换视频测试](https://www.bilibili.com/video/BV13S4y1e7Yu)  
+[Bilibili BV13S4y1e7Yu：须弥外壳](https://www.bilibili.com/video/BV1ma41197kk)  
 
 
 **警告：如果你没有能够完全理解整个设计的能力，那就不推荐做。** 因为我也不知道又会遇到什么坑  
