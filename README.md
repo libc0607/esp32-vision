@@ -1,3 +1,8 @@
+本项目已停止更新，已停止任何形式的技术支持。但您仍然可以查看全部开源资料，并在遵守开源协议的情况下使用。  
+如果您遇到任何问题，可以学习那位的美德后自行解决，也可以在教令院找阿帽。阿帽不好听吗？  
+
+---
+
 # ESP32 神之眼 Genshin Impact Vision
 
 [![Inazuma_Electro_Demo](https://res.cloudinary.com/marcomontalbano/image/upload/v1656770471/video_to_markdown/images/youtube--uiCPUxYVVak-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=uiCPUxYVVak "Inazuma_Electro_Demo")  
